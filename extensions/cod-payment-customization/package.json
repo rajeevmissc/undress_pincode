@@ -1,0 +1,11 @@
+{
+  "name": "cod-payment-customization",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "node test-run.mjs"
+  },
+  "dependencies": {
+    "@shopify/shopify_function": "^1.0.0"
+  }
+}

@@ -1,0 +1,27 @@
+# NOTE: like the payment function's toml, this is illustrative and not CLI-verified
+# (no Shopify CLI/Partner auth available in the sandbox this was built in). The
+# component code (Checkout.tsx) IS typechecked against the real, installed
+# @shopify/ui-extensions and @shopify/ui-extensions-react packages - see README.
+# Regenerate this file with:
+#   shopify app generate extension --template checkout_ui --name cod-checkout-attribute
+# then drop src/Checkout.tsx in and point the target/module at it.
+
+api_version = "2025-07"
+
+[[extensions]]
+name = "COD pincode check"
+handle = "cod-checkout-attribute"
+type = "ui_extension"
+
+  [[extensions.targeting]]
+  target = "purchase.checkout.delivery-address.render-after"
+  module = "src/Checkout.tsx"
+
+# Settings so the API base URL is configurable per-store from the checkout
+# editor, instead of hardcoded into the bundle.
+[extensions.settings]
+  [[extensions.settings.fields]]
+  key = "api_base_url"
+  type = "single_line_text_field"
+  name = "Pincode delivery API base URL"
+  description = "e.g. https://your-server.example.com (the pincode-delivery-app server)"

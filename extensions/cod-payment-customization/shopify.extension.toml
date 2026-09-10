@@ -1,0 +1,20 @@
+# NOTE: this file is illustrative, not verified against the current Shopify CLI schema.
+# Generate the real one with:
+#   shopify app generate extension --template payment_customization --name cod-payment-customization
+# then replace its src/run.js and src/run.graphql with the two files in this folder -
+# the CLI-generated toml will be correct for whatever CLI/API version you're on.
+
+api_version = "2025-07"
+
+[[extensions]]
+name = "COD eligibility by pincode"
+handle = "cod-payment-customization"
+type = "function"
+
+  [[extensions.targeting]]
+  target = "purchase.payment-customization.run"
+  input_query = "src/run.graphql"
+  export = "run"
+
+[extensions.build]
+path = "dist/function.wasm"

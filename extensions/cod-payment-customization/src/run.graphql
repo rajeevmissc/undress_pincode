@@ -1,0 +1,11 @@
+query RunInput {
+  cart {
+    attribute(key: "cod_eligible") {
+      value
+    }
+  }
+  paymentMethods {
+    id
+    name
+  }
+}
