@@ -205,7 +205,6 @@
 
 
 
-
 import {
   PincodeServiceability,
   Courier,
@@ -246,6 +245,14 @@ export const DEFAULT_OPTION = {
   price: 100,
   transitLabel: "8-10 business days",
 };
+
+/**
+ * Flat handling fee added on top of every COD option's price, regardless of
+ * which courier is fulfilling it or how that base price was computed. Applied
+ * once, centrally, in resolveFromRecord below - never add it at an individual
+ * option's construction site.
+ */
+export const COD_HANDLING_FEE = 25;
 
 /** Just the fields the resolver needs - lets tests pass plain objects. */
 export type PincodeInput = Pick<
@@ -389,7 +396,13 @@ export function resolveFromRecord(pincode: string, rec: PincodeInput): ResolvedS
     pincode,
     serviceable: true,
     courier,
-    options: options.map((o) => ({ ...o, courier: o.courier ?? courier })),
+    options: options.map((o) => ({
+      ...o,
+      courier: o.courier ?? courier,
+      // COD handling fee applies once here, regardless of which branch above
+      // built the option or how its base price was computed.
+      price: o.cod ? o.price + COD_HANDLING_FEE : o.price,
+    })),
   };
 }
 
