@@ -1,0 +1,164 @@
+{%- comment -%}
+  Pincode "Check delivery" widget for the product page.
+
+  Two ways to use it:
+  A) Theme editor (no code): Online Store > Themes > Customize > open a Product
+     template > Add block > "Custom Liquid" > paste this whole file > Save.
+  B) As a snippet: save this file as snippets/delivery-check.liquid, then add
+       {% render 'delivery-check' %}
+     inside sections/main-product.liquid where you want it (e.g. right after the
+     buy buttons block).
+
+  It calls the deployed backend's public /check/:pincode endpoint. No courier
+  names are shown to the customer by default (toggle with show_courier below).
+{%- endcomment -%}
+
+{%- liquid
+  assign api_base = 'https://undress-pincode.onrender.com'
+  assign show_courier = false
+-%}
+
+<div
+  class="delivery-check"
+  data-delivery-check
+  data-api="{{ api_base }}"
+  data-show-courier="{{ show_courier }}"
+>
+  <label class="delivery-check__label" for="delivery-check-pin">Check delivery &amp; COD for your PIN code</label>
+
+  <form class="delivery-check__form" data-dc-form novalidate>
+    <input
+      id="delivery-check-pin"
+      class="delivery-check__input"
+      type="text"
+      inputmode="numeric"
+      autocomplete="postal-code"
+      maxlength="6"
+      pattern="[1-9][0-9]{5}"
+      placeholder="e.g. 110020"
+      data-dc-input
+      required
+    >
+    <button type="submit" class="delivery-check__btn" data-dc-btn>Check</button>
+  </form>
+
+  <div class="delivery-check__out" data-dc-out role="status" aria-live="polite"></div>
+</div>
+
+<style>
+  .delivery-check{margin:1rem 0;font-size:.95rem;line-height:1.4}
+  .delivery-check__label{display:block;font-weight:600;margin-bottom:.5rem}
+  .delivery-check__form{display:flex;gap:.5rem;flex-wrap:wrap;max-width:22rem}
+  .delivery-check__input{flex:1 1 8rem;min-width:0;padding:.6rem .7rem;border:1px solid currentColor;border-radius:.4rem;background:transparent;color:inherit;font:inherit;letter-spacing:.08em}
+  .delivery-check__input:focus{outline:2px solid currentColor;outline-offset:1px}
+  .delivery-check__btn{padding:.6rem 1.1rem;border:1px solid currentColor;border-radius:.4rem;background:currentColor;color:Canvas;font:inherit;font-weight:600;cursor:pointer}
+  .delivery-check__btn[disabled]{opacity:.55;cursor:default}
+  .delivery-check__out{margin-top:.75rem}
+  .delivery-check__out:empty{display:none}
+  .delivery-check__card{border:1px solid rgba(128,128,128,.35);border-radius:.5rem;padding:.75rem .9rem}
+  .delivery-check__row{display:flex;justify-content:space-between;gap:1rem;padding:.35rem 0}
+  .delivery-check__row + .delivery-check__row{border-top:1px dashed rgba(128,128,128,.3)}
+  .delivery-check__name{font-weight:600}
+  .delivery-check__meta{opacity:.75;font-size:.85em}
+  .delivery-check__price{white-space:nowrap;font-weight:600}
+  .delivery-check__cod{margin-top:.5rem;font-size:.9em}
+  .delivery-check__err{color:#b00020}
+  .delivery-check__muted{opacity:.7}
+</style>
+
+<script>
+  (function () {
+    var root = document.currentScript.previousElementSibling;
+    while (root && !root.hasAttribute('data-delivery-check')) root = root.previousElementSibling;
+    if (!root || root.dataset.dcInit) return;
+    root.dataset.dcInit = '1';
+
+    var API = (root.dataset.api || '').replace(/\/+$/, '');
+    var SHOW_COURIER = root.dataset.showCourier === 'true';
+    var form = root.querySelector('[data-dc-form]');
+    var input = root.querySelector('[data-dc-input]');
+    var btn = root.querySelector('[data-dc-btn]');
+    var out = root.querySelector('[data-dc-out]');
+    var PIN_RE = /^[1-9][0-9]{5}$/;
+
+    try {
+      var saved = localStorage.getItem('dc_pin');
+      if (saved && PIN_RE.test(saved)) input.value = saved;
+    } catch (e) {}
+
+    input.addEventListener('input', function () {
+      input.value = input.value.replace(/[^0-9]/g, '').slice(0, 6);
+    });
+
+    function money(n) { return n === 0 ? 'Free' : '₹' + n; }
+
+    function esc(s) {
+      var d = document.createElement('div');
+      d.textContent = s == null ? '' : String(s);
+      return d.innerHTML;
+    }
+
+    function render(data) {
+      var prepaid = (data.options || []).filter(function (o) { return !o.cod; });
+      var cod = (data.options || []).filter(function (o) { return o.cod; })[0];
+
+      var rows = prepaid.map(function (o) {
+        return (
+          '<div class="delivery-check__row">' +
+            '<span><span class="delivery-check__name">' + esc(o.name) + '</span>' +
+              '<br><span class="delivery-check__meta">' + esc(o.transitLabel) +
+              (SHOW_COURIER && o.courier ? ' · ' + esc(o.courier) : '') + '</span></span>' +
+            '<span class="delivery-check__price">' + money(o.price) + '</span>' +
+          '</div>'
+        );
+      }).join('');
+
+      var codLine = cod
+        ? '<div class="delivery-check__cod">✓ Cash on Delivery available &mdash; <strong>' + money(cod.price) + '</strong></div>'
+        : '<div class="delivery-check__cod delivery-check__muted">Cash on Delivery not available for this PIN</div>';
+
+      out.innerHTML = '<div class="delivery-check__card">' + (rows || '') + codLine + '</div>';
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var pin = (input.value || '').trim();
+      if (!PIN_RE.test(pin)) {
+        out.innerHTML = '<p class="delivery-check__err">Enter a valid 6-digit PIN code.</p>';
+        return;
+      }
+      try { localStorage.setItem('dc_pin', pin); } catch (e2) {}
+
+      btn.disabled = true;
+      out.innerHTML = '<p class="delivery-check__muted">Checking…</p>';
+
+      var ctrl = new AbortController();
+      var timer = setTimeout(function () { ctrl.abort(); }, 20000); // Render free tier can cold-start
+
+      fetch(API + '/check/' + pin, { signal: ctrl.signal, headers: { Accept: 'application/json' } })
+        .then(function (res) {
+          return res.json().catch(function () { return {}; }).then(function (body) {
+            if (!res.ok) throw new Error(body && body.error ? body.error : 'Could not check this PIN right now.');
+            return body;
+          });
+        })
+        .then(function (data) {
+          if (!data || !data.serviceable || !(data.options && data.options.length)) {
+            out.innerHTML = '<p class="delivery-check__muted">Sorry, we don’t deliver to this PIN code yet.</p>';
+            return;
+          }
+          render(data);
+        })
+        .catch(function (err) {
+          var msg = err && err.name === 'AbortError'
+            ? 'The delivery service is waking up. Please try again in a few seconds.'
+            : (err && err.message) || 'Could not check this PIN right now.';
+          out.innerHTML = '<p class="delivery-check__err">' + esc(msg) + '</p>';
+        })
+        .finally(function () {
+          clearTimeout(timer);
+          btn.disabled = false;
+        });
+    });
+  })();
+</script>

@@ -4,7 +4,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
  * npm run test-resolver   -   no database, pure logic test of resolveFromRecord.
  *
  * Covers the rules agreed for the dtdc_delhivary_data.xlsx model:
- *  - DTDC serves  -> only DTDC options (Standard = Surface/free, Priority = Air, COD when flagged)
+ *  - DTDC serves  -> DTDC options (Standard = Surface/free, Priority = Air, COD when flagged);
+ *                    if DTDC has no COD, Delhivery's COD is borrowed when Delhivery flags it
  *  - DTDC absent  -> Delhivery fallback: one Standard option + COD when flagged
  *  - a null tier means "not offered", never "offered for free"
  *  - the delivery partner (courier) is included on the result and every option
@@ -63,7 +64,9 @@ const tier = (price, days) => ({ available: true, price, transitDays: days, tran
     assert(r.options[0].price === 100 && r.options[0].transitDays === 7, "744103 PRIORITY 100, 7 days");
     assert(!r.options.some((o) => o.code === "STANDARD"), "744103 NO phantom STANDARD from a null Surface tier");
 }
-// 4. DTDC serves but has NO COD, and Delhivery ALSO serves -> Delhivery must NOT leak in
+// 4. DTDC serves but has NO COD -> borrow Delhivery's COD (prepaid rows stay DTDC).
+//    Price = Delhivery's own Standard price (120), NOT the small zone COD fee (82) -
+//    same convention as DTDC's own COD riding on its Air price.
 {
     const rec = {
         serviceable: true,
@@ -71,10 +74,24 @@ const tier = (price, days) => ({ available: true, price, transitDays: days, tran
         delhivery: { serviceable: true, standard: tier(120, null), cod: { available: true, price: 82, transitDays: null, transitLabel: null } },
     };
     const r = (0, rateResolver_1.resolveFromRecord)("500001", rec);
-    console.log("500001 DTDC no-COD, Delhivery ignored:", JSON.stringify(r));
+    console.log("500001 DTDC no-COD, Delhivery COD borrowed:", JSON.stringify(r));
     assert(r.courier === "DTDC", "500001 fulfilled by DTDC");
-    assert(r.options.map((o) => o.code).sort().join(",") === "PRIORITY,STANDARD", "500001 only DTDC Standard+Priority");
-    assert(!r.options.some((o) => o.code === "COD"), "500001 NO COD (DTDC has none, Delhivery not used as fallback here)");
+    assert(r.options.map((o) => o.code).sort().join(",") === "COD,PRIORITY,STANDARD", "500001 DTDC Standard+Priority plus borrowed COD");
+    const cod = r.options.find((o) => o.code === "COD");
+    assert(cod?.price === 120 && cod?.cod === true, "500001 borrowed COD = 120 (Delhivery Standard price, not the 82 zone fee)");
+    assert(cod?.courier === "DELHIVERY", "500001 borrowed COD row tagged courier DELHIVERY");
+    assert(r.options.filter((o) => o.code !== "COD").every((o) => o.courier === "DTDC"), "500001 prepaid rows still tagged DTDC");
+}
+// 4b. DTDC serves, no DTDC COD, and Delhivery has no COD either -> still no COD
+{
+    const rec = {
+        serviceable: true,
+        dtdc: { serviceable: true, surface: tier(0, 6), air: tier(82, 3), cod: { available: false, price: null, transitDays: null, transitLabel: null } },
+        delhivery: { serviceable: true, standard: tier(120, null), cod: { available: false, price: null, transitDays: null, transitLabel: null } },
+    };
+    const r = (0, rateResolver_1.resolveFromRecord)("500002", rec);
+    assert(!r.options.some((o) => o.code === "COD"), "500002 no COD when neither DTDC nor Delhivery offers it");
+    assert(r.options.every((o) => o.courier === "DTDC"), "500002 all rows DTDC");
 }
 // 5. Delhivery-only, North East: Standard price 150 + COD 100, fixed transit label
 {

@@ -6,8 +6,10 @@
  *   - a serviceable pincode always yields at least one option
  *   - every option has a finite price >= 0
  *   - a COD option always has a defined price
- *   - when DTDC serves a pincode, NO Delhivery option is ever offered
- *   - the public payload never contains a courier name
+ *   - when DTDC serves a pincode, every prepaid (non-COD) option is DTDC's own;
+ *     the only option allowed to carry a different courier is a COD row borrowed
+ *     from Delhivery (only when DTDC itself has no COD for that pincode)
+ *   - the public payload always contains a courier name
  */
 import path from "path";
 import { Workbook } from "exceljs";
@@ -36,6 +38,8 @@ async function main() {
     withStandard: 0,
     withPriority: 0,
     withCod: 0,
+    withDtdcOwnCod: 0,
+    withBorrowedDelhiveryCod: 0,
     noService: 0,
   };
 
@@ -59,7 +63,12 @@ async function main() {
     if (resolved.courier === "DELHIVERY") tally.viaDelhivery++;
     if (resolved.options.some((o) => o.code === "STANDARD")) tally.withStandard++;
     if (resolved.options.some((o) => o.code === "PRIORITY")) tally.withPriority++;
-    if (resolved.options.some((o) => o.code === "COD")) tally.withCod++;
+    const codOpt = resolved.options.find((o) => o.code === "COD");
+    if (codOpt) {
+      tally.withCod++;
+      if (codOpt.courier === "DTDC") tally.withDtdcOwnCod++;
+      if (codOpt.courier === "DELHIVERY" && resolved.courier === "DTDC") tally.withBorrowedDelhiveryCod++;
+    }
 
     if (resolved.options.length === 0) {
       console.error(`ISSUE ${rec.pincode}: serviceable but produced no options`);
@@ -87,9 +96,42 @@ async function main() {
       console.error(`ISSUE ${rec.pincode}: unexpected courier "${resolved.courier}"`);
       issues++;
     }
-    if (!resolved.options.every((o) => o.courier === resolved.courier)) {
-      console.error(`ISSUE ${rec.pincode}: option courier does not match result courier`);
+    // Every option must carry the pincode's fulfilling courier, EXCEPT a COD row
+    // borrowed from Delhivery when DTDC serves the pincode but has no COD itself.
+    for (const o of resolved.options) {
+      const isBorrowedCod = resolved.courier === "DTDC" && o.code === "COD" && o.courier === "DELHIVERY";
+      if (o.courier !== resolved.courier && !isBorrowedCod) {
+        console.error(`ISSUE ${rec.pincode}: option ${o.code} courier "${o.courier}" does not match result courier "${resolved.courier}"`);
+        issues++;
+      }
+    }
+    // Every non-COD (prepaid) option must always be DTDC's own when DTDC serves the pincode.
+    if (resolved.courier === "DTDC" && resolved.options.some((o) => o.code !== "COD" && o.courier !== "DTDC")) {
+      console.error(`ISSUE ${rec.pincode}: a prepaid option leaked a non-DTDC courier`);
       issues++;
+    }
+    // The borrowed-COD fallback must only fire when DTDC truly has no COD of its own.
+    if (codOpt?.courier === "DELHIVERY" && resolved.courier === "DTDC" && rec.dtdc.cod?.available) {
+      console.error(`ISSUE ${rec.pincode}: borrowed Delhivery COD shown even though DTDC has its own COD`);
+      issues++;
+    }
+    // And it must only fire when Delhivery actually flags COD for that pincode.
+    if (codOpt?.courier === "DELHIVERY" && resolved.courier === "DTDC" && !rec.delhivery?.cod?.available) {
+      console.error(`ISSUE ${rec.pincode}: borrowed Delhivery COD shown but Delhivery has no COD on file`);
+      issues++;
+    }
+    // If DTDC has no COD and Delhivery does, the customer must NOT be left without COD.
+    if (resolved.courier === "DTDC" && !rec.dtdc.cod?.available && rec.delhivery?.cod?.available && !codOpt) {
+      console.error(`ISSUE ${rec.pincode}: Delhivery COD available but resolver produced no COD option`);
+      issues++;
+    }
+    // Borrowed Delhivery COD must price at Delhivery's own Standard price (120 / 150 NE),
+    // never the small zone COD handling fee.
+    if (codOpt?.courier === "DELHIVERY" && resolved.courier === "DTDC" && rec.delhivery?.standard) {
+      if (codOpt.price !== rec.delhivery.standard.price) {
+        console.error(`ISSUE ${rec.pincode}: borrowed Delhivery COD priced ${codOpt.price}, expected Standard price ${rec.delhivery.standard.price}`);
+        issues++;
+      }
     }
     if (!/"courier":/.test(pub)) {
       console.error(`ISSUE ${rec.pincode}: courier missing from public payload`);

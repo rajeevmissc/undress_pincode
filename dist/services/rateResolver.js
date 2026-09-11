@@ -29,16 +29,21 @@ function transitTextFor(info, fallback) {
 /**
  * Pure decision logic - no database.
  *
- *  - If DTDC serves the pincode, the customer is offered ONLY DTDC options:
+ *  - If DTDC serves the pincode, the customer is offered DTDC options:
  *      Standard (Surface, always free), Priority (Air), and COD when DTDC flags it.
- *  - Delhivery is used ONLY when DTDC does not serve the pincode at all. It then
- *    offers a single "Standard" option, plus COD when Delhivery flags it.
+ *    If DTDC serves the pincode but has no COD of its own, Delhivery's COD option
+ *    is borrowed (tagged courier "DELHIVERY") when Delhivery flags COD there.
+ *  - Delhivery is otherwise used only when DTDC does not serve the pincode at all.
+ *    It then offers a single "Standard" option, plus COD when Delhivery flags it.
  *  - If neither courier has data for the pincode, a single default Speed Post
  *    option (prepaid, no COD) is returned so checkout is never left with nothing.
  *  - The fulfilling partner ("DTDC" | "DELHIVERY" | "SPEEDPOST") is included on
  *    the result and on every option.
  */
 function resolveFromRecord(pincode, rec) {
+    // Options normally inherit the pincode's single fulfilling courier. A row may
+    // carry its own `courier` to override that (used for the DTDC->Delhivery COD
+    // fallback below).
     const options = [];
     let courier = "SPEEDPOST";
     if (rec && rec.serviceable && rec.dtdc?.serviceable) {
@@ -76,6 +81,24 @@ function resolveFromRecord(pincode, rec) {
                 transitDays: codDays,
                 transitLabel: transitTextFor({ transitDays: codDays, transitLabel: dtdc.cod.transitLabel }, "Pay when your order arrives"),
                 cod: true,
+            });
+        }
+        else if (rec.delhivery?.cod?.available) {
+            // DTDC serves this pincode but offers no COD - borrow Delhivery's COD so the
+            // customer still gets a pay-on-delivery option. Price = Delhivery's own
+            // Standard price (120, or 150 for North East) - same convention as DTDC
+            // COD riding on its Air price above - NOT the small zone COD handling fee.
+            // This row is fulfilled by Delhivery, so it carries its own courier tag.
+            const delCod = rec.delhivery.cod;
+            const delStandard = rec.delhivery.standard;
+            options.push({
+                code: "COD",
+                name: "Cash on Delivery",
+                price: delStandard?.price ?? delCod.price ?? 0,
+                transitDays: delStandard?.transitDays ?? delCod.transitDays,
+                transitLabel: transitTextFor(delStandard ?? delCod, pincodeDataset_1.DELHIVERY_TRANSIT_LABEL),
+                cod: true,
+                courier: "DELHIVERY",
             });
         }
     }
@@ -120,7 +143,7 @@ function resolveFromRecord(pincode, rec) {
         pincode,
         serviceable: true,
         courier,
-        options: options.map((o) => ({ ...o, courier })),
+        options: options.map((o) => ({ ...o, courier: o.courier ?? courier })),
     };
 }
 /** DB-backed wrapper used by the routes. */
