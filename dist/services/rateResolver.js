@@ -163,10 +163,9 @@
 
 
 
-
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_OPTION = void 0;
+exports.COD_HANDLING_FEE = exports.DEFAULT_OPTION = void 0;
 exports.resolveFromRecord = resolveFromRecord;
 exports.resolveServiceabilityForPincode = resolveServiceabilityForPincode;
 exports.toPublicServiceability = toPublicServiceability;
@@ -183,6 +182,13 @@ exports.DEFAULT_OPTION = {
     price: 100,
     transitLabel: "8-10 business days",
 };
+/**
+ * Flat handling fee added on top of every COD option's price, regardless of
+ * which courier is fulfilling it or how that base price was computed. Applied
+ * once, centrally, in resolveFromRecord below - never add it at an individual
+ * option's construction site.
+ */
+exports.COD_HANDLING_FEE = 25;
 function daysLabel(days) {
     if (days === null || days === undefined || !Number.isFinite(days))
         return "";
@@ -309,7 +315,13 @@ function resolveFromRecord(pincode, rec) {
         pincode,
         serviceable: true,
         courier,
-        options: options.map((o) => ({ ...o, courier: o.courier ?? courier })),
+        options: options.map((o) => ({
+            ...o,
+            courier: o.courier ?? courier,
+            // COD handling fee applies once here, regardless of which branch above
+            // built the option or how its base price was computed.
+            price: o.cod ? o.price + exports.COD_HANDLING_FEE : o.price,
+        })),
     };
 }
 /** DB-backed wrapper used by the routes. */
@@ -326,3 +338,4 @@ async function resolveServiceabilityForPincode(rawPincode) {
 function toPublicServiceability(r) {
     return r;
 }
+
