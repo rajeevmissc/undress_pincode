@@ -204,7 +204,6 @@
 // }
 
 
-
 import {
   PincodeServiceability,
   Courier,
@@ -220,7 +219,8 @@ export type FulfilmentChannel = Courier | "SPEEDPOST";
 export interface DeliveryOption {
   code: OptionCode;
   name: string;
-  price: number; // rupees
+  price: number; // rupees, total (base + codFee when cod is true)
+  codFee: number | null; // the COD_HANDLING_FEE portion already folded into `price`, or null when cod is false
   transitDays: number | null; // whole-day estimate, or null when we only have a text label
   transitLabel: string; // human string shown to the customer
   cod: boolean;
@@ -291,7 +291,7 @@ export function resolveFromRecord(pincode: string, rec: PincodeInput): ResolvedS
   // Options normally inherit the pincode's single fulfilling courier. A row may
   // carry its own `courier` to override that (used for the DTDC->Delhivery COD
   // fallback below).
-  const options: (Omit<DeliveryOption, "courier"> & { courier?: FulfilmentChannel })[] = [];
+  const options: (Omit<DeliveryOption, "courier" | "codFee"> & { courier?: FulfilmentChannel })[] = [];
   let courier: FulfilmentChannel = "SPEEDPOST";
 
   if (rec && rec.serviceable && rec.dtdc?.serviceable) {
@@ -400,8 +400,11 @@ export function resolveFromRecord(pincode: string, rec: PincodeInput): ResolvedS
       ...o,
       courier: o.courier ?? courier,
       // COD handling fee applies once here, regardless of which branch above
-      // built the option or how its base price was computed.
+      // built the option or how its base price was computed. `codFee` is
+      // exposed separately (on top of the already-inclusive `price`) so
+      // consumers can show the shopper a "base + COD fee" breakdown.
       price: o.cod ? o.price + COD_HANDLING_FEE : o.price,
+      codFee: o.cod ? COD_HANDLING_FEE : null,
     })),
   };
 }
@@ -423,3 +426,4 @@ export async function resolveServiceabilityForPincode(
 export function toPublicServiceability(r: ResolvedServiceability) {
   return r;
 }
+
