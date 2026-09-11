@@ -86,7 +86,11 @@ router.post("/rates", async (req, res) => {
             // const description = opt.codFee
             //     ? `${opt.transitLabel} (includes ₹${opt.codFee} COD handling fee)`
             //     : opt.transitLabel;
-            const description = opt.codFee ? `Includes ₹${opt.codFee} COD handling fee` : undefined;
+            const hasDateEstimate = !!(opt.transitDays && opt.transitDays > 0);
+            const feeNote = opt.codFee ? `Includes ₹${opt.codFee} COD handling fee` : null;
+            const description = hasDateEstimate
+                ? feeNote ?? undefined
+                : [opt.transitLabel, feeNote].filter(Boolean).join(" · ");
             const rate = {
                 service_name: opt.name,
                 service_code: opt.code,
@@ -95,7 +99,7 @@ router.post("/rates", async (req, res) => {
                 description,
                 courier: opt.courier,
             };
-            if (opt.transitDays && opt.transitDays > 0) {
+            if (hasDateEstimate) {
                 rate.min_delivery_date = now.toISOString();
                 rate.max_delivery_date = addBusinessDays(now, opt.transitDays).toISOString();
             }
