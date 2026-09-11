@@ -142,7 +142,11 @@ router.post("/rates", async (req: Request, res: Response) => {
       //   ? `${opt.transitLabel} (includes ₹${opt.codFee} COD handling fee)`
       //   : opt.transitLabel;
 
-      const description = opt.codFee ? `Includes ₹${opt.codFee} COD handling fee` : undefined;
+      const hasDateEstimate = !!(opt.transitDays && opt.transitDays > 0);
+      const feeNote = opt.codFee ? `Includes ₹${opt.codFee} COD handling fee` : null;
+      const description = hasDateEstimate
+        ? feeNote ?? undefined
+        : [opt.transitLabel, feeNote].filter(Boolean).join(" · ");
       const rate: ShopifyRate = {
         service_name: opt.name,
         service_code: opt.code,
@@ -151,9 +155,9 @@ router.post("/rates", async (req: Request, res: Response) => {
         description,
         courier: opt.courier,
       };
-      if (opt.transitDays && opt.transitDays > 0) {
+      if (hasDateEstimate) {
         rate.min_delivery_date = now.toISOString();
-        rate.max_delivery_date = addBusinessDays(now, opt.transitDays).toISOString();
+        rate.max_delivery_date = addBusinessDays(now, opt.transitDays as number).toISOString();
       }
       return rate;
     });
