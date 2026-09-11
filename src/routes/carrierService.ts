@@ -142,7 +142,7 @@ router.post("/rates", async (req: Request, res: Response) => {
       //   ? `${opt.transitLabel} (includes ₹${opt.codFee} COD handling fee)`
       //   : opt.transitLabel;
 
-        const description = opt.codFee ? `Includes ₹${opt.codFee} COD handling fee` : undefined;
+      const description = opt.codFee ? `Includes ₹${opt.codFee} COD handling fee` : undefined;
       const rate: ShopifyRate = {
         service_name: opt.name,
         service_code: opt.code,
