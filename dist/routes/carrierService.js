@@ -83,9 +83,10 @@ router.post("/rates", async (req, res) => {
             // Spell out the COD handling fee in the description so the shopper sees
             // why this option costs more than the equivalent prepaid one, instead of
             // just a bare total.
-            const description = opt.codFee
-                ? `${opt.transitLabel} (includes ₹${opt.codFee} COD handling fee)`
-                : opt.transitLabel;
+            // const description = opt.codFee
+            //     ? `${opt.transitLabel} (includes ₹${opt.codFee} COD handling fee)`
+            //     : opt.transitLabel;
+            const description = opt.codFee ? `Includes ₹${opt.codFee} COD handling fee` : undefined;
             const rate = {
                 service_name: opt.name,
                 service_code: opt.code,
