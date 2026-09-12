@@ -196,7 +196,7 @@ exports.DEFAULT_OPTION = {
     code: "SPEEDPOST",
     name: "Speed Post",
     price: 100,
-    transitLabel: "8-10 business days
+    transitLabel: "8-10 business days"
 };
 /**
  * Flat handling fee added on top of every COD option's price, regardless of
