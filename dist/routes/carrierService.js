@@ -32,10 +32,14 @@ router.post("/rates", async (req, res) => {
             //     ? `${opt.transitLabel} (includes ₹${opt.codFee} COD handling fee)`
             //     : opt.transitLabel;
             const hasDateEstimate = !!(opt.transitDays && opt.transitDays > 0);
-            const feeNote = opt.codFee ? `Includes ₹${opt.codFee} COD handling charge. This charge is waived if you choose to pay online now.` : null;
+            
+            const feeNote = opt.codFee
+                ? `Includes ₹${opt.codFee} COD handling charge. This charge is waived if you choose to pay online now.`
+                : null;
+            
             const description = hasDateEstimate
-                ? feeNote ?? undefined
-                : [opt.transitLabel, feeNote].filter(Boolean).join(" · ");
+                ? [opt.transitLabel, feeNote].filter(Boolean).join("\n")
+                : [opt.transitLabel, feeNote].filter(Boolean).join("\n");
             const rate = {
                 service_name: opt.name,
                 service_code: opt.code,
