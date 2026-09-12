@@ -157,7 +157,7 @@ function resolveFromRecord(pincode, rec) {
             // built the option or how its base price was computed. `codFee` is
             // exposed separately (on top of the already-inclusive `price`) so
             // consumers can show the shopper a "base + COD fee" breakdown.
-            // price: o.cod ? o.price + exports.COD_HANDLING_FEE : o.price,
+            price: o.cod ? o.price + exports.COD_HANDLING_FEE : o.price,
             codFee: o.cod ? exports.COD_HANDLING_FEE : null,
         })),
     };
