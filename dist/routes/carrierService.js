@@ -31,25 +31,29 @@ router.post("/rates", async (req, res) => {
             // const description = opt.codFee
             //     ? `${opt.transitLabel} (includes ₹${opt.codFee} COD handling fee)`
             //     : opt.transitLabel;
-              const hasDateEstimate = !!(opt.transitDays && opt.transitDays > 0);
-              const feeNote = opt.codFee ? `Includes ₹${opt.codFee} COD handling charge. This charge is waived if you choose to pay online now.` : null;
-              const description = hasDateEstimate
-                ? feeNote ?? undefined
-                : [opt.transitLabel, feeNote].filter(Boolean).join(" · ");
-              const rate: ShopifyRate = {
+            const hasDateEstimate = !!(opt.transitDays && opt.transitDays > 0);
+            
+            const feeNote = opt.codFee
+                ? `Includes ₹${opt.codFee} COD handling charge. This charge is waived if you choose to pay online now.`
+                : null;
+            
+            const description = hasDateEstimate
+                ? [opt.transitLabel, feeNote].filter(Boolean).join("\n")
+                : [opt.transitLabel, feeNote].filter(Boolean).join("\n");
+            const rate = {
                 service_name: opt.name,
                 service_code: opt.code,
                 total_price: String(Math.round(opt.price * 100)),
                 currency: "INR",
                 description,
                 courier: opt.courier,
-              };
-              if (hasDateEstimate) {
+            };
+            if (hasDateEstimate) {
                 rate.min_delivery_date = now.toISOString();
-                rate.max_delivery_date = addBusinessDays(now, opt.transitDays as number).toISOString();
-              }
-              return rate;
-            });
+                rate.max_delivery_date = addBusinessDays(now, opt.transitDays).toISOString();
+            }
+            return rate;
+        });
         // Empty array (not an error) is how you tell Shopify "we have no rates for this address"
         return res.json(rates.length ? { rates, courier: resolved.courier } : { rates });
     }
@@ -61,7 +65,3 @@ router.post("/rates", async (req, res) => {
     }
 });
 exports.default = router;
-
-
-
-
