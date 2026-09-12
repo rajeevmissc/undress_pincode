@@ -13,7 +13,8 @@
 // export interface DeliveryOption {
 //   code: OptionCode;
 //   name: string;
-//   price: number; // rupees
+//   price: number; // rupees, total (base + codFee when cod is true)
+//   codFee: number | null; // the COD_HANDLING_FEE portion already folded into `price`, or null when cod is false
 //   transitDays: number | null; // whole-day estimate, or null when we only have a text label
 //   transitLabel: string; // human string shown to the customer
 //   cod: boolean;
@@ -38,6 +39,14 @@
 //   price: 100,
 //   transitLabel: "8-10 business days",
 // };
+
+// /**
+//  * Flat handling fee added on top of every COD option's price, regardless of
+//  * which courier is fulfilling it or how that base price was computed. Applied
+//  * once, centrally, in resolveFromRecord below - never add it at an individual
+//  * option's construction site.
+//  */
+// export const COD_HANDLING_FEE = 25;
 
 // /** Just the fields the resolver needs - lets tests pass plain objects. */
 // export type PincodeInput = Pick<
@@ -76,7 +85,7 @@
 //   // Options normally inherit the pincode's single fulfilling courier. A row may
 //   // carry its own `courier` to override that (used for the DTDC->Delhivery COD
 //   // fallback below).
-//   const options: (Omit<DeliveryOption, "courier"> & { courier?: FulfilmentChannel })[] = [];
+//   const options: (Omit<DeliveryOption, "courier" | "codFee"> & { courier?: FulfilmentChannel })[] = [];
 //   let courier: FulfilmentChannel = "SPEEDPOST";
 
 //   if (rec && rec.serviceable && rec.dtdc?.serviceable) {
@@ -181,7 +190,16 @@
 //     pincode,
 //     serviceable: true,
 //     courier,
-//     options: options.map((o) => ({ ...o, courier: o.courier ?? courier })),
+//     options: options.map((o) => ({
+//       ...o,
+//       courier: o.courier ?? courier,
+//       // COD handling fee applies once here, regardless of which branch above
+//       // built the option or how its base price was computed. `codFee` is
+//       // exposed separately (on top of the already-inclusive `price`) so
+//       // consumers can show the shopper a "base + COD fee" breakdown.
+//       price: o.cod ? o.price + COD_HANDLING_FEE : o.price,
+//       codFee: o.cod ? COD_HANDLING_FEE : null,
+//     })),
 //   };
 // }
 
@@ -204,39 +222,48 @@
 // }
 
 
+
+
+
 import {
   PincodeServiceability,
   Courier,
   PincodeServiceabilityDoc,
 } from "../models/PincodeServiceability";
-import { DELHIVERY_TRANSIT_LABEL } from "./pincodeDataset";
+import { DELHIVERY_TRANSIT_LABEL } fr
 
-export type OptionCode = "STANDARD" | "PRIORITY" | "COD" | "SPEEDPOST";
+export type OptionCode = "STANDARD" |EDPOST";
 
-/** The delivery partner fulfilling the pincode. Included in API responses. */
+/** The delivery partner fulfilling tI responses. */
 export type FulfilmentChannel = Courier | "SPEEDPOST";
 
 export interface DeliveryOption {
   code: OptionCode;
   name: string;
-  price: number; // rupees, total (base + codFee when cod is true)
-  codFee: number | null; // the COD_HANDLING_FEE portion already folded into `price`, or null when cod is false
+  price: number; // rupees - base couThe COD handling
+                 // fee is never folded in here: it ships to Shopify checkout
+                 // as its own separa
+                 // extensions/cod-fee-line-item), so the shipping rate and the
+                 // fee show up as tworder summary.
+  codFee: number | null; // COD_HANDLING_FEE when cod is true, else null. Not part of `price` -
+purely informational (shown as a noted by the checkout extension to sizethe fee line item... though the fee product's own Shopify price is the real source of truth for what
+gets charged).
   transitDays: number | null; // whole-day estimate, or null when we only have a text label
-  transitLabel: string; // human string shown to the customer
+  transitLabel: string; // human stri
   cod: boolean;
-  courier: FulfilmentChannel; // "DTDC" | "DELHIVERY" | "SPEEDPOST"
+  courier: FulfilmentChannel; // "DTDOST"
 }
 
 export interface ResolvedServiceability {
   pincode: string;
   serviceable: boolean;
-  courier: FulfilmentChannel; // which partner fulfils this pincode (same for all its options)
+  courier: FulfilmentChannel; // whiccode (same for all its options)
   options: DeliveryOption[];
 }
 
 /**
  * Last-resort option used when neither DTDC nor Delhivery has data for a pincode
- * (including a pincode that isn't in the DB at all). Speed Post reaches every
+ * (including a pincode that isn't int reaches every
  * Indian PIN, so with this the checkout always has at least one shipping option.
  */
 export const DEFAULT_OPTION = {
@@ -248,21 +275,21 @@ export const DEFAULT_OPTION = {
 
 /**
  * Flat handling fee added on top of every COD option's price, regardless of
- * which courier is fulfilling it or how that base price was computed. Applied
+ * which courier is fulfilling it or mputed. Applied
  * once, centrally, in resolveFromRecord below - never add it at an individual
  * option's construction site.
  */
 export const COD_HANDLING_FEE = 25;
 
-/** Just the fields the resolver needs - lets tests pass plain objects. */
+/** Just the fields the resolver needobjects. */
 export type PincodeInput = Pick<
   PincodeServiceabilityDoc,
   "serviceable" | "dtdc" | "delhivery"
 > | null | undefined;
 
-function daysLabel(days: number | null | undefined): string {
+function daysLabel(days: number | nul
   if (days === null || days === undefined || !Number.isFinite(days)) return "";
-  return days === 1 ? "1 business day" : `${days} business days`;
+  return days === 1 ? "1 business day`;
 }
 
 /** Prefer a label stored on the document; fall back to the day count, then to text. */
@@ -270,28 +297,29 @@ function transitTextFor(
   info: { transitDays?: number | null; transitLabel?: string | null } | null | undefined,
   fallback: string
 ): string {
-  return info?.transitLabel || daysLabel(info?.transitDays) || fallback;
+  return info?.transitLabel || daysLafallback;
 }
 
 /**
  * Pure decision logic - no database.
  *
- *  - If DTDC serves the pincode, the customer is offered DTDC options:
+ *  - If DTDC serves the pincode, theoptions:
  *      Standard (Surface, always free), Priority (Air), and COD when DTDC flags it.
- *    If DTDC serves the pincode but has no COD of its own, Delhivery's COD option
+ *    If DTDC serves the pincode but hivery's COD option
  *    is borrowed (tagged courier "DELHIVERY") when Delhivery flags COD there.
- *  - Delhivery is otherwise used only when DTDC does not serve the pincode at all.
+ *  - Delhivery is otherwise used onl the pincode at all.
  *    It then offers a single "Standard" option, plus COD when Delhivery flags it.
- *  - If neither courier has data for the pincode, a single default Speed Post
+ *  - If neither courier has data forault Speed Post
  *    option (prepaid, no COD) is returned so checkout is never left with nothing.
- *  - The fulfilling partner ("DTDC" | "DELHIVERY" | "SPEEDPOST") is included on
+ *  - The fulfilling partner ("DTDC" ") is included on
  *    the result and on every option.
  */
 export function resolveFromRecord(pincode: string, rec: PincodeInput): ResolvedServiceability {
-  // Options normally inherit the pincode's single fulfilling courier. A row may
+  // Options normally inherit the pinourier. A row may
   // carry its own `courier` to override that (used for the DTDC->Delhivery COD
   // fallback below).
-  const options: (Omit<DeliveryOption, "courier" | "codFee"> & { courier?: FulfilmentChannel })[] = [];
+  const options: (Omit<DeliveryOption, "courier" | "codFee"> & { courier?: FulfilmentChannel })[] =
+[];
   let courier: FulfilmentChannel = "SPEEDPOST";
 
   if (rec && rec.serviceable && rec.dtdc?.serviceable) {
@@ -305,7 +333,7 @@ export function resolveFromRecord(pincode: string, rec: PincodeInput): ResolvedS
         name: "Standard Delivery",
         price: dtdc.surface.price,
         transitDays: dtdc.surface.transitDays,
-        transitLabel: transitTextFor(dtdc.surface, "Standard delivery"),
+        transitLabel: transitTextFor(livery"),
         cod: false,
       });
     }
@@ -317,41 +345,42 @@ export function resolveFromRecord(pincode: string, rec: PincodeInput): ResolvedS
         name: "Priority Delivery",
         price: dtdc.air.price,
         transitDays: dtdc.air.transitDays,
-        transitLabel: transitTextFor(dtdc.air, "Priority delivery"),
+        transitLabel: transitTextFor(ry"),
         cod: false,
       });
     }
 
     // COD rides on the DTDC network; fee already stored as the Air price.
     if (dtdc.cod?.available) {
-      const codDays = dtdc.cod.transitDays ?? dtdc.air?.transitDays ?? dtdc.surface?.transitDays ?? null;
+      const codDays = dtdc.cod.transitDays ?? dtdc.air?.transitDays ?? dtdc.surface?.transitDays ??
+null;
       options.push({
         code: "COD",
         name: "Cash on Delivery",
         price: dtdc.cod.price ?? 0,
         transitDays: codDays,
-        transitLabel: transitTextFor({ transitDays: codDays, transitLabel: dtdc.cod.transitLabel }, "Pay when your order arrives"),
+        transitLabel: transitTextFor(ansitLabel: dtdc.cod.transitLabel },"Pay when your order arrives"),
         cod: true,
       });
-    } else if (rec.delhivery?.cod?.available) {
+    } else if (rec.delhivery?.cod?.av
       // DTDC serves this pincode but offers no COD - borrow Delhivery's COD so the
-      // customer still gets a pay-on-delivery option. Price = Delhivery's own
+      // customer still gets a pay-onDelhivery's own
       // Standard price (120, or 150 for North East) - same convention as DTDC
-      // COD riding on its Air price above - NOT the small zone COD handling fee.
+      // COD riding on its Air price  COD handling fee.
       // This row is fulfilled by Delhivery, so it carries its own courier tag.
-      const delCod = rec.delhivery.cod;
+      const delCod = rec.delhivery.co
       const delStandard = rec.delhivery.standard;
       options.push({
         code: "COD",
         name: "Cash on Delivery",
         price: delStandard?.price ?? delCod.price ?? 0,
-        transitDays: delStandard?.transitDays ?? delCod.transitDays,
+        transitDays: delStandard?.traDays,
         transitLabel: transitTextFor(delStandard ?? delCod, DELHIVERY_TRANSIT_LABEL),
         cod: true,
         courier: "DELHIVERY",
       });
     }
-  } else if (rec && rec.serviceable && rec.delhivery?.serviceable) {
+  } else if (rec && rec.serviceable &le) {
     // ---- Delhivery fallback (DTDC does not serve this pincode) ----
     const { delhivery } = rec;
     courier = "DELHIVERY";
@@ -361,7 +390,7 @@ export function resolveFromRecord(pincode: string, rec: PincodeInput): ResolvedS
         code: "STANDARD",
         name: "Standard Delivery",
         price: delhivery.standard.price,
-        transitDays: delhivery.standard.transitDays,
+        transitDays: delhivery.standa
         transitLabel: transitTextFor(delhivery.standard, DELHIVERY_TRANSIT_LABEL),
         cod: false,
       });
@@ -371,15 +400,15 @@ export function resolveFromRecord(pincode: string, rec: PincodeInput): ResolvedS
       options.push({
         code: "COD",
         name: "Cash on Delivery",
-        price: delhivery.cod.price ?? 0,
+        price: delhivery.cod.price ??
         transitDays: delhivery.cod.transitDays,
-        transitLabel: transitTextFor(delhivery.cod, DELHIVERY_TRANSIT_LABEL),
+        transitLabel: transitTextFor(RANSIT_LABEL),
         cod: true,
       });
     }
   }
 
-  // Nothing from either courier (or no record at all) -> default Speed Post option.
+  // Nothing from either courier (or lt Speed Post option.
   if (options.length === 0) {
     courier = "SPEEDPOST";
     options.push({
@@ -387,7 +416,7 @@ export function resolveFromRecord(pincode: string, rec: PincodeInput): ResolvedS
       name: DEFAULT_OPTION.name,
       price: DEFAULT_OPTION.price,
       transitDays: null,
-      transitLabel: DEFAULT_OPTION.transitLabel,
+      transitLabel: DEFAULT_OPTION.tr
       cod: false,
     });
   }
@@ -399,31 +428,30 @@ export function resolveFromRecord(pincode: string, rec: PincodeInput): ResolvedS
     options: options.map((o) => ({
       ...o,
       courier: o.courier ?? courier,
-      // COD handling fee applies once here, regardless of which branch above
-      // built the option or how its base price was computed. `codFee` is
-      // exposed separately (on top of the already-inclusive `price`) so
-      // consumers can show the shopper a "base + COD fee" breakdown.
-      price: o.cod ? o.price + COD_HANDLING_FEE : o.price,
+      // `price` stays the bare courig fee is NOT
+      // folded in. It travels to checkout as its own cart line item instead
+      // (extensions/cod-fee-line-iteD fee show as
+      // two separate amounts in the order summary rather than one bundled
+      // shipping total. `codFee` is /reference.
       codFee: o.cod ? COD_HANDLING_FEE : null,
     })),
   };
 }
 
-/** DB-backed wrapper used by the routes. */
+/** DB-backed wrapper used by the rou
 export async function resolveServiceabilityForPincode(
   rawPincode: string
 ): Promise<ResolvedServiceability> {
   const pincode = rawPincode.trim();
   const rec = await PincodeServiceability.findOne({ pincode }).lean();
-  return resolveFromRecord(pincode, rec as PincodeInput);
+  return resolveFromRecord(pincode, r
 }
 
 /**
- * Shapes the resolver result for the public API. Kept as a seam in case fields
+ * Shapes the resolver result for them in case fields
  * ever need to be withheld again; currently a straight passthrough (the store
- * wants the delivery-partner name included).
+ * wants the delivery-partner name in
  */
-export function toPublicServiceability(r: ResolvedServiceability) {
+export function toPublicServiceability) {
   return r;
 }
-
