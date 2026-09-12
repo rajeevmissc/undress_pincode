@@ -208,7 +208,7 @@ exports.COD_HANDLING_FEE = 25;
 function daysLabel(days) {
     if (days === null || days === und(days))
         return "";
-    return days === 1 ? "1 business dys`;
+    return days === 1 ? "1 business dys";
 }
 /** Prefer a label stored on the docu count, then to text. */
 function transitTextFor(info, fallback) {
@@ -261,8 +261,7 @@ function resolveFromRecord(pincode, r
         }
         // COD rides on the DTDC network; fee already stored as the Air price.
         if (dtdc.cod?.available) {
-            const codDays = dtdc.cod.transitDays ?? dtdc.air?.transitDays ??
-dtdc.surface?.transitDays ?? null;
+            const codDays = dtdc.cod.transitDays ?? dtdc.air?.transitDays ?? dtdc.surface?.transitDays ?? null;
             options.push({
                 code: "COD",
                 name: "Cash on Delivery",
