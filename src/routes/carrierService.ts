@@ -59,7 +59,7 @@ router.post("/rates", async (req: Request, res: Response) => {
       //   : opt.transitLabel;
 
       const hasDateEstimate = !!(opt.transitDays && opt.transitDays > 0);
-      const feeNote = opt.codFee ? `Includes ₹${opt.codFee} COD handling fee` : null;
+      const feeNote = opt.codFee ? `+ ₹${opt.codFee} COD handling fee added separately` : null;
       const description = hasDateEstimate
         ? feeNote ?? undefined
         : [opt.transitLabel, feeNote].filter(Boolean).join(" · ");
