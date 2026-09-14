@@ -2,7 +2,7 @@ import { Router, Request, Response } from "express";
 import { verifyShopifyWebhook } from "../services/shopifyWebhook";
 import { normalizeIndianPhone } from "../services/phone";
 import { sendWhatsAppMessage, buildOrderConfirmationMessage } from "../services/ultramsg";
-import { OrderConfirmation } from "../models/OrderConfirmation";
+import { OrderConfirmation, OrderConfirmationLineItem } from "../models/OrderConfirmation";
 
 const router = Router();
 
@@ -17,6 +17,7 @@ interface ShopifyOrderWebhookPayload {
   customer?: { first_name?: string; phone?: string | null } | null;
   shipping_address?: { first_name?: string; phone?: string | null } | null;
   billing_address?: { first_name?: string; phone?: string | null } | null;
+  line_items?: { title: string; quantity: number; price: string }[];
 }
 
 function isCodOrder(payload: ShopifyOrderWebhookPayload): boolean {
@@ -42,6 +43,14 @@ function pickCustomerName(payload: ShopifyOrderWebhookPayload): string {
     payload.billing_address?.first_name ||
     "there"
   );
+}
+
+function pickLineItems(payload: ShopifyOrderWebhookPayload): OrderConfirmationLineItem[] {
+  return (payload.line_items || []).map((li) => ({
+    title: li.title,
+    quantity: li.quantity,
+    price: li.price,
+  }));
 }
 
 // Mounted at exactly "/webhooks/orders-create" in server.ts (with a raw body
@@ -79,20 +88,26 @@ router.post("/", async (req: Request, res: Response) => {
       return res.status(200).json({ skipped: "no-phone" });
     }
 
+    const customerName = pickCustomerName(payload);
+    const items = pickLineItems(payload);
+
     await OrderConfirmation.create({
       shopifyOrderId: String(payload.id),
       orderName: payload.name,
       phone,
       amount: payload.total_price,
       currency: payload.currency,
+      customerName,
+      items,
       status: "pending",
     });
 
     const message = buildOrderConfirmationMessage({
-      customerName: pickCustomerName(payload),
+      customerName,
       orderName: payload.name,
       amount: payload.total_price,
       currency: payload.currency,
+      items,
     });
     await sendWhatsAppMessage(phone, message);
 

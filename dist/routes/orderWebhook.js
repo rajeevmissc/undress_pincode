@@ -22,6 +22,13 @@ function pickCustomerName(payload) {
         payload.billing_address?.first_name ||
         "there");
 }
+function pickLineItems(payload) {
+    return (payload.line_items || []).map((li) => ({
+        title: li.title,
+        quantity: li.quantity,
+        price: li.price,
+    }));
+}
 // Mounted at exactly "/webhooks/orders-create" in server.ts (with a raw body
 // parser ahead of it) - the route path here is just "/", not "/orders-create".
 // HMAC verification runs against the exact bytes Shopify sent, before any
@@ -51,19 +58,24 @@ router.post("/", async (req, res) => {
             console.warn(`orders/create webhook: order ${payload.name} has no usable phone number, skipping WhatsApp`);
             return res.status(200).json({ skipped: "no-phone" });
         }
+        const customerName = pickCustomerName(payload);
+        const items = pickLineItems(payload);
         await OrderConfirmation_1.OrderConfirmation.create({
             shopifyOrderId: String(payload.id),
             orderName: payload.name,
             phone,
             amount: payload.total_price,
             currency: payload.currency,
+            customerName,
+            items,
             status: "pending",
         });
         const message = (0, ultramsg_1.buildOrderConfirmationMessage)({
-            customerName: pickCustomerName(payload),
+            customerName,
             orderName: payload.name,
             amount: payload.total_price,
             currency: payload.currency,
+            items,
         });
         await (0, ultramsg_1.sendWhatsAppMessage)(phone, message);
         return res.status(200).json({ ok: true });
