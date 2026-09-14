@@ -60,6 +60,7 @@ router.post("/", async (req, res) => {
         }
         const customerName = pickCustomerName(payload);
         const items = pickLineItems(payload);
+        const orderStatusUrl = payload.order_status_url || null;
         await OrderConfirmation_1.OrderConfirmation.create({
             shopifyOrderId: String(payload.id),
             orderName: payload.name,
@@ -68,6 +69,7 @@ router.post("/", async (req, res) => {
             currency: payload.currency,
             customerName,
             items,
+            orderStatusUrl,
             status: "pending",
         });
         const message = (0, ultramsg_1.buildOrderConfirmationMessage)({
@@ -76,6 +78,7 @@ router.post("/", async (req, res) => {
             amount: payload.total_price,
             currency: payload.currency,
             items,
+            orderStatusUrl,
         });
         await (0, ultramsg_1.sendWhatsAppMessage)(phone, message);
         return res.status(200).json({ ok: true });

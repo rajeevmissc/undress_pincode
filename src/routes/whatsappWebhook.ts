@@ -51,8 +51,8 @@ router.post("/ultramsg-incoming", async (req: Request, res: Response) => {
       // for a reply has passed) - don't re-run cancellation/tagging.
       const reply =
         confirmation.status === "confirmed"
-          ? buildConfirmedReply(confirmation.orderName)
-          : buildCancelledReply(confirmation.orderName);
+          ? buildConfirmedReply(confirmation.orderName, confirmation.orderStatusUrl)
+          : buildCancelledReply(confirmation.orderName, confirmation.orderStatusUrl);
       await sendWhatsAppMessage(phone, reply);
       return res.status(200).json({ skipped: "already-resolved" });
     }
@@ -77,7 +77,7 @@ router.post("/ultramsg-incoming", async (req: Request, res: Response) => {
         console.error("addOrderTag failed (non-fatal):", tagErr);
       }
 
-      await sendWhatsAppMessage(phone, buildConfirmedReply(confirmation.orderName));
+      await sendWhatsAppMessage(phone, buildConfirmedReply(confirmation.orderName, confirmation.orderStatusUrl));
       return res.status(200).json({ ok: true, intent });
     }
 
@@ -98,7 +98,7 @@ router.post("/ultramsg-incoming", async (req: Request, res: Response) => {
     confirmation.status = "cancelled";
     confirmation.respondedAt = new Date();
     await confirmation.save();
-    await sendWhatsAppMessage(phone, buildCancelledReply(confirmation.orderName));
+    await sendWhatsAppMessage(phone, buildCancelledReply(confirmation.orderName, confirmation.orderStatusUrl));
     return res.status(200).json({ ok: true, intent });
   } catch (err) {
     console.error("ultramsg-incoming webhook error:", err);

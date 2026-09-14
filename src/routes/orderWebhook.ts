@@ -18,6 +18,7 @@ interface ShopifyOrderWebhookPayload {
   shipping_address?: { first_name?: string; phone?: string | null } | null;
   billing_address?: { first_name?: string; phone?: string | null } | null;
   line_items?: { title: string; quantity: number; price: string }[];
+  order_status_url?: string | null; // Shopify's own per-order, per-customer tracking page
 }
 
 function isCodOrder(payload: ShopifyOrderWebhookPayload): boolean {
@@ -90,6 +91,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     const customerName = pickCustomerName(payload);
     const items = pickLineItems(payload);
+    const orderStatusUrl = payload.order_status_url || null;
 
     await OrderConfirmation.create({
       shopifyOrderId: String(payload.id),
@@ -99,6 +101,7 @@ router.post("/", async (req: Request, res: Response) => {
       currency: payload.currency,
       customerName,
       items,
+      orderStatusUrl,
       status: "pending",
     });
 
@@ -108,6 +111,7 @@ router.post("/", async (req: Request, res: Response) => {
       amount: payload.total_price,
       currency: payload.currency,
       items,
+      orderStatusUrl,
     });
     await sendWhatsAppMessage(phone, message);
 

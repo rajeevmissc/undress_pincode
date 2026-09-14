@@ -31,8 +31,8 @@ router.post("/ultramsg-incoming", async (req, res) => {
             // Already resolved (e.g. customer replies twice, or after the window
             // for a reply has passed) - don't re-run cancellation/tagging.
             const reply = confirmation.status === "confirmed"
-                ? (0, ultramsg_1.buildConfirmedReply)(confirmation.orderName)
-                : (0, ultramsg_1.buildCancelledReply)(confirmation.orderName);
+                ? (0, ultramsg_1.buildConfirmedReply)(confirmation.orderName, confirmation.orderStatusUrl)
+                : (0, ultramsg_1.buildCancelledReply)(confirmation.orderName, confirmation.orderStatusUrl);
             await (0, ultramsg_1.sendWhatsAppMessage)(phone, reply);
             return res.status(200).json({ skipped: "already-resolved" });
         }
@@ -53,7 +53,7 @@ router.post("/ultramsg-incoming", async (req, res) => {
                 // let it block telling the customer their confirmation went through.
                 console.error("addOrderTag failed (non-fatal):", tagErr);
             }
-            await (0, ultramsg_1.sendWhatsAppMessage)(phone, (0, ultramsg_1.buildConfirmedReply)(confirmation.orderName));
+            await (0, ultramsg_1.sendWhatsAppMessage)(phone, (0, ultramsg_1.buildConfirmedReply)(confirmation.orderName, confirmation.orderStatusUrl));
             return res.status(200).json({ ok: true, intent });
         }
         // intent === "cancel"
@@ -70,7 +70,7 @@ router.post("/ultramsg-incoming", async (req, res) => {
         confirmation.status = "cancelled";
         confirmation.respondedAt = new Date();
         await confirmation.save();
-        await (0, ultramsg_1.sendWhatsAppMessage)(phone, (0, ultramsg_1.buildCancelledReply)(confirmation.orderName));
+        await (0, ultramsg_1.sendWhatsAppMessage)(phone, (0, ultramsg_1.buildCancelledReply)(confirmation.orderName, confirmation.orderStatusUrl));
         return res.status(200).json({ ok: true, intent });
     }
     catch (err) {

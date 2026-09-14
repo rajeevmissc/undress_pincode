@@ -62,6 +62,10 @@ function formatItemsList(items: OrderConfirmationLineItem[], currency: string): 
     .join("\n");
 }
 
+function trackingLine(orderStatusUrl: string | null | undefined): string {
+  return orderStatusUrl ? `🔗 Track your order: ${orderStatusUrl}\n\n` : "";
+}
+
 /** The order-confirmation prompt sent right after a COD order is placed. */
 export function buildOrderConfirmationMessage(opts: {
   customerName: string;
@@ -69,8 +73,9 @@ export function buildOrderConfirmationMessage(opts: {
   amount: string;
   currency: string;
   items: OrderConfirmationLineItem[];
+  orderStatusUrl?: string | null;
 }): string {
-  const { customerName, orderName, amount, currency, items } = opts;
+  const { customerName, orderName, amount, currency, items, orderStatusUrl } = opts;
   const itemsBlock = formatItemsList(items, currency);
 
   return (
@@ -80,6 +85,7 @@ export function buildOrderConfirmationMessage(opts: {
     `Your order *${orderName}* has been placed successfully! 🎉\n\n` +
     (itemsBlock ? `📦 *Order Summary*\n${itemsBlock}\n\n` : "") +
     `💰 *Total: ${money(currency, amount)}* _(Cash on Delivery)_\n\n` +
+    trackingLine(orderStatusUrl) +
     `Please confirm this order so we can get it packed and shipped:\n\n` +
     `✅ Reply *CONFIRM* to confirm\n` +
     `❌ Reply *CANCEL* to cancel\n\n` +
@@ -87,18 +93,20 @@ export function buildOrderConfirmationMessage(opts: {
   );
 }
 
-export function buildConfirmedReply(orderName: string): string {
+export function buildConfirmedReply(orderName: string, orderStatusUrl?: string | null): string {
   return (
     `✅ *Order Confirmed — ${orderName}*\n\n` +
     `Thank you for confirming! Your order is now being prepared and will be shipped soon. 📦\n\n` +
+    trackingLine(orderStatusUrl) +
     BRAND_FOOTER
   );
 }
 
-export function buildCancelledReply(orderName: string): string {
+export function buildCancelledReply(orderName: string, orderStatusUrl?: string | null): string {
   return (
     `❌ *Order Cancelled — ${orderName}*\n\n` +
     `Your order has been cancelled as requested. If this was a mistake, feel free to place a new order anytime. 💛\n\n` +
+    trackingLine(orderStatusUrl) +
     BRAND_FOOTER
   );
 }
