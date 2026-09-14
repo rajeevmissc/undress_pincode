@@ -9,6 +9,7 @@ api_version = "2025-07"
 [[extensions]]
 name = "COD eligibility by pincode"
 handle = "cod-payment-customization"
+uid = "1733616f-e5ea-8bc8-de3a-c903f0162a8f680973b9"
 type = "function"
 
   [[extensions.targeting]]

@@ -1,0 +1,77 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const shopifyWebhook_1 = require("../services/shopifyWebhook");
+const phone_1 = require("../services/phone");
+const ultramsg_1 = require("../services/ultramsg");
+const OrderConfirmation_1 = require("../models/OrderConfirmation");
+const router = (0, express_1.Router)();
+function isCodOrder(payload) {
+    return (payload.payment_gateway_names || []).some((name) => name.toLowerCase().includes("cash on delivery"));
+}
+function pickPhone(payload) {
+    return (payload.shipping_address?.phone ||
+        payload.customer?.phone ||
+        payload.billing_address?.phone ||
+        payload.phone ||
+        null);
+}
+function pickCustomerName(payload) {
+    return (payload.shipping_address?.first_name ||
+        payload.customer?.first_name ||
+        payload.billing_address?.first_name ||
+        "there");
+}
+// Mounted at exactly "/webhooks/orders-create" in server.ts (with a raw body
+// parser ahead of it) - the route path here is just "/", not "/orders-create".
+// HMAC verification runs against the exact bytes Shopify sent, before any
+// JSON parsing.
+router.post("/", async (req, res) => {
+    try {
+        const rawBody = req.body;
+        const hmacOk = (0, shopifyWebhook_1.verifyShopifyWebhook)(rawBody, req.get("X-Shopify-Hmac-Sha256"));
+        if (!hmacOk) {
+            console.warn("orders/create webhook: invalid HMAC, rejecting");
+            return res.status(401).send("invalid signature");
+        }
+        const payload = JSON.parse(rawBody.toString("utf8"));
+        if (!isCodOrder(payload)) {
+            // Not a COD order - nothing for the WhatsApp flow to do. Still 200 so
+            // Shopify doesn't retry a webhook we intentionally ignore.
+            return res.status(200).json({ skipped: "not-cod" });
+        }
+        const phone = (0, phone_1.normalizeIndianPhone)(pickPhone(payload));
+        if (!phone) {
+            console.warn(`orders/create webhook: order ${payload.name} has no usable phone number, skipping WhatsApp`);
+            return res.status(200).json({ skipped: "no-phone" });
+        }
+        await OrderConfirmation_1.OrderConfirmation.create({
+            shopifyOrderId: String(payload.id),
+            orderName: payload.name,
+            phone,
+            amount: payload.total_price,
+            currency: payload.currency,
+            status: "pending",
+        });
+        const message = (0, ultramsg_1.buildOrderConfirmationMessage)({
+            customerName: pickCustomerName(payload),
+            orderName: payload.name,
+            amount: payload.total_price,
+            currency: payload.currency,
+        });
+        await (0, ultramsg_1.sendWhatsAppMessage)(phone, message);
+        return res.status(200).json({ ok: true });
+    }
+    catch (err) {
+        // Duplicate key (order webhook redelivered by Shopify) is expected and
+        // harmless - the first delivery already sent the WhatsApp message.
+        if (err && typeof err === "object" && "code" in err && err.code === 11000) {
+            return res.status(200).json({ skipped: "duplicate" });
+        }
+        console.error("orders/create webhook error:", err);
+        // 500 makes Shopify retry the delivery - appropriate for a transient
+        // failure (DB/UltraMsg down), unlike a deliberate `skipped` response above.
+        return res.status(500).json({ error: "internal error" });
+    }
+});
+exports.default = router;

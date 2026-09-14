@@ -9,16 +9,20 @@
     "start": "node dist/server.js",
     "import": "ts-node src/scripts/importXlsx.ts",
     "test-resolver": "ts-node src/scripts/testResolver.ts",
+    "test-phone": "ts-node src/scripts/testPhone.ts",
     "validate-data": "ts-node --transpile-only scripts/validateRealData.ts",
     "register-carrier-service": "ts-node src/scripts/registerCarrierService.ts"
   },
   "dependencies": {
+    "@preact/signals": "^2.11.2",
+    "@shopify/ui-extensions": "2026.7.0",
     "cors": "^2.8.6",
     "dotenv": "^16.4.5",
     "exceljs": "^4.4.0",
     "express": "^4.19.2",
     "mongoose": "^8.5.0",
-    "multer": "^2.0.0"
+    "multer": "^2.0.0",
+    "preact": "^10.29.8"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

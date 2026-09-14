@@ -1,0 +1,28 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "b90fa2394575306607373ff6b1e98391"
+application_url = "https://example.com"
+embedded = true
+name = "custom_shiping"
+
+[webhooks]
+api_version = "2026-07"
+
+  # Fired the instant a COD order is placed - src/routes/orderWebhook.ts sends
+  # the WhatsApp confirmation prompt from here. HMAC-verified using this app's
+  # Client Secret (SHOPIFY_CLIENT_SECRET), see src/services/shopifyWebhook.ts.
+  [[webhooks.subscriptions]]
+  topics = ["orders/create"]
+  uri = "https://undress-pincode.onrender.com/webhooks/orders-create"
+
+[access_scopes]
+# Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
+# read_orders/write_orders added for the WhatsApp confirm/cancel flow -
+# src/services/shopifyAdmin.ts reads and cancels orders, and receiving the
+# orders/create webhook itself requires read_orders too.
+scopes = "read_shipping,write_shipping,read_orders,write_orders"
+optional_scopes = [ ]
+use_legacy_install_flow = false
+
+[auth]
+redirect_urls = [ ]

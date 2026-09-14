@@ -176,4 +176,3 @@ async function resolveServiceabilityForPincode(rawPincode) {
 function toPublicServiceability(r) {
     return r;
 }
-

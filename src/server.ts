@@ -5,12 +5,26 @@ import { connectDb } from "./db";
 import carrierServiceRoutes from "./routes/carrierService";
 import pincodeCheckRoutes from "./routes/pincodeCheck";
 import adminImportRoutes from "./routes/adminImport";
+import orderWebhookRoutes from "./routes/orderWebhook";
+import whatsappWebhookRoutes from "./routes/whatsappWebhook";
 
 async function main() {
   await connectDb();
 
   const app = express();
+
+  // Shopify signs the orders/create webhook over the exact raw request bytes -
+  // this MUST be mounted with a raw body parser, and BEFORE the global
+  // express.json() below, or the signature can never verify. Scoped to this
+  // exact path (not all of /webhooks) so it doesn't consume the request
+  // stream ahead of express.json() for any other route.
+  app.use("/webhooks/orders-create", express.raw({ type: "application/json" }), orderWebhookRoutes);
+
   app.use(express.json());
+
+  // Called by UltraMsg when the customer replies on WhatsApp - no signature to
+  // verify (UltraMsg doesn't sign webhook deliveries), plain JSON is fine.
+  app.use("/webhooks", whatsappWebhookRoutes);
 
   // Called by Shopify at checkout - must stay fast and public (Shopify calls it server-to-server)
   app.use("/shopify", carrierServiceRoutes);

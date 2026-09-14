@@ -1,0 +1,36 @@
+# Learn more about configuring your checkout UI extension:
+# https://shopify.dev/docs/api/checkout-ui-extensions/latest/configuration
+
+# The version of APIs your extension will receive. Learn more:
+# https://shopify.dev/docs/api/usage/versioning
+api_version = "2026-07"
+
+[[extensions]]
+name = "cod-fee-line-item"
+handle = "cod-fee-line-item"
+type = "ui_extension"
+uid = "b104ba78-20bc-4e6d-bbd8-7d74df5dec3ff2ed95ac"
+
+# Controls where in Shopify your extension will be injected,
+# and the file that contains your extension’s source code. Learn more:
+# https://shopify.dev/docs/api/checkout-ui-extensions/latest/extension-targets-overview
+
+[[extensions.targeting]]
+module = "./src/Checkout.jsx"
+target = "purchase.checkout.block.render"
+
+# No extra capabilities needed - this extension only reads the delivery
+# groups/cart lines already available on the standard checkout API and calls
+# applyCartLinesChange(), it doesn't query the storefront API, make network
+# calls, or touch metafields.
+
+# Defines settings that will be collected from merchants installing
+# your extension. Learn more:
+# https://shopify.dev/docs/api/checkout-ui-extensions/latest/configuration#settings-definition
+
+[extensions.settings]
+  [[extensions.settings.fields]]
+  key = "cod_fee_variant_id"
+  type = "single_line_text_field"
+  name = "COD handling fee - product variant GID"
+  description = "gid://shopify/ProductVariant/<id> for the 'COD Handling Fee' product's variant. Create that product first (₹25, not a physical product, inventory tracking off), then paste its variant GID here."

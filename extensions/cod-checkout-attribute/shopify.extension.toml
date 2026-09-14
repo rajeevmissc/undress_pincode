@@ -11,6 +11,7 @@ api_version = "2025-07"
 [[extensions]]
 name = "COD pincode check"
 handle = "cod-checkout-attribute"
+uid = "9a1e66c4-d52b-508e-0600-0d4ab67ca4658268f991"
 type = "ui_extension"
 
   [[extensions.targeting]]
