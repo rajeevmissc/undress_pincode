@@ -57,6 +57,11 @@ router.post("/", async (req, res) => {
             return res.status(401).send("invalid signature");
         }
         const payload = JSON.parse(rawBody.toString("utf8"));
+        const shop = req.get("X-Shopify-Shop-Domain");
+        if (!shop) {
+            console.warn(`orders/create webhook: order ${payload.name} has no X-Shopify-Shop-Domain header, skipping`);
+            return res.status(200).json({ skipped: "no-shop-header" });
+        }
         if (!isCodOrder(payload)) {
             // Not a COD order - nothing for the WhatsApp flow to do. Still 200 so
             // Shopify doesn't retry a webhook we intentionally ignore.
@@ -72,6 +77,7 @@ router.post("/", async (req, res) => {
         const orderStatusUrl = payload.order_status_url || null;
         const address = formatAddress(payload.shipping_address || payload.billing_address);
         await OrderConfirmation_1.OrderConfirmation.create({
+            shop,
             shopifyOrderId: String(payload.id),
             orderName: payload.name,
             phone,

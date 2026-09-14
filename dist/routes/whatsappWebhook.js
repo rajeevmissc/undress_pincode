@@ -52,7 +52,7 @@ router.post("/ultramsg-incoming", async (req, res) => {
             confirmation.respondedAt = new Date();
             await confirmation.save();
             try {
-                await (0, shopifyAdmin_1.addOrderTag)(confirmation.shopifyOrderId, "WhatsApp Confirmed");
+                await (0, shopifyAdmin_1.addOrderTag)(confirmation.shop, confirmation.shopifyOrderId, "WhatsApp Confirmed");
             }
             catch (tagErr) {
                 // Tagging is a nice-to-have for the merchant's own visibility - never
@@ -64,7 +64,7 @@ router.post("/ultramsg-incoming", async (req, res) => {
         }
         // intent === "cancel"
         try {
-            await (0, shopifyAdmin_1.cancelOrder)(confirmation.shopifyOrderId);
+            await (0, shopifyAdmin_1.cancelOrder)(confirmation.shop, confirmation.shopifyOrderId);
         }
         catch (cancelErr) {
             // Leave status as "pending" so this shows up as unresolved rather than

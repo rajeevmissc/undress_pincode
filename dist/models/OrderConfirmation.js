@@ -8,6 +8,7 @@ const OrderConfirmationLineItemSchema = new mongoose_1.Schema({
     price: { type: String, required: true },
 }, { _id: false });
 const OrderConfirmationSchema = new mongoose_1.Schema({
+    shop: { type: String, required: true, index: true },
     shopifyOrderId: { type: String, required: true, unique: true, index: true },
     orderName: { type: String, required: true },
     phone: { type: String, required: true, index: true },
