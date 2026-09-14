@@ -79,7 +79,7 @@ router.post("/ultramsg-incoming", async (req: Request, res: Response) => {
       await confirmation.save();
 
       try {
-        await addOrderTag(confirmation.shop, confirmation.shopifyOrderId, "WhatsApp Confirmed");
+        await addOrderTag(confirmation.shopifyOrderId, "WhatsApp Confirmed");
       } catch (tagErr) {
         // Tagging is a nice-to-have for the merchant's own visibility - never
         // let it block telling the customer their confirmation went through.
@@ -92,7 +92,7 @@ router.post("/ultramsg-incoming", async (req: Request, res: Response) => {
 
     // intent === "cancel"
     try {
-      await cancelOrder(confirmation.shop, confirmation.shopifyOrderId);
+      await cancelOrder(confirmation.shopifyOrderId);
     } catch (cancelErr) {
       // Leave status as "pending" so this shows up as unresolved rather than
       // silently lying to the merchant that it was cancelled.

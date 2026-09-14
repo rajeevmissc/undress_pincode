@@ -96,11 +96,6 @@ router.post("/", async (req: Request, res: Response) => {
     }
 
     const payload = JSON.parse(rawBody.toString("utf8")) as ShopifyOrderWebhookPayload;
-    const shop = req.get("X-Shopify-Shop-Domain");
-    if (!shop) {
-      console.warn(`orders/create webhook: order ${payload.name} has no X-Shopify-Shop-Domain header, skipping`);
-      return res.status(200).json({ skipped: "no-shop-header" });
-    }
 
     if (!isCodOrder(payload)) {
       // Not a COD order - nothing for the WhatsApp flow to do. Still 200 so
@@ -120,7 +115,6 @@ router.post("/", async (req: Request, res: Response) => {
     const address = formatAddress(payload.shipping_address || payload.billing_address);
 
     await OrderConfirmation.create({
-      shop,
       shopifyOrderId: String(payload.id),
       orderName: payload.name,
       phone,

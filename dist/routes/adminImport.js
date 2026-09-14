@@ -8,7 +8,6 @@ const multer_1 = __importDefault(require("multer"));
 const pincodeStore_1 = require("../services/pincodeStore");
 const phone_1 = require("../services/phone");
 const ultramsg_1 = require("../services/ultramsg");
-const shopifyAdmin_1 = require("../services/shopifyAdmin");
 const router = (0, express_1.Router)();
 const upload = (0, multer_1.default)({
     storage: multer_1.default.memoryStorage(),
@@ -76,47 +75,26 @@ router.get("/env-check", requireAdminKey, (_req, res) => {
             return { set: false };
         return { set: true, length: v.length, startsWith: v.slice(0, 4), endsWith: v.slice(-4) };
     };
-    let adminTokensShops;
-    if (process.env.SHOPIFY_ADMIN_TOKENS) {
-        try {
-            adminTokensShops = Object.keys(JSON.parse(process.env.SHOPIFY_ADMIN_TOKENS));
-        }
-        catch {
-            adminTokensShops = "invalid-json";
-        }
-    }
     return res.json({
         SHOPIFY_SHOP: describe("SHOPIFY_SHOP"),
         SHOPIFY_ADMIN_ACCESS_TOKEN: describe("SHOPIFY_ADMIN_ACCESS_TOKEN"),
-        // Multi-store token map - shown as which shops it covers, never the tokens.
-        SHOPIFY_ADMIN_TOKENS: adminTokensShops ? { set: true, shops: adminTokensShops } : { set: false },
         SHOPIFY_CLIENT_SECRET: describe("SHOPIFY_CLIENT_SECRET"),
         ULTRAMSG_INSTANCE_ID: describe("ULTRAMSG_INSTANCE_ID"),
         ULTRAMSG_TOKEN: describe("ULTRAMSG_TOKEN"),
     });
 });
 /**
- * GET /admin/token-check?shop=your-store.myshopify.com
- * Makes one real, cheap Admin API call (GET /shop.json) with the Admin API
- * token this server has for that shop (see services/shopifyAdmin.ts's
- * multi-store token lookup), to tell "token expired/invalid" apart from
+ * GET /admin/token-check
+ * Makes one real, cheap Admin API call (GET /shop.json) with this server's
+ * SHOPIFY_ADMIN_ACCESS_TOKEN, to tell "token expired/invalid" apart from
  * "token valid but missing a scope" apart from "everything's fine" - without
- * ever printing the token. `shop` defaults to SHOPIFY_SHOP if omitted.
+ * ever printing the token.
  */
-router.get("/token-check", requireAdminKey, async (req, res) => {
-    const shop = req.query.shop || process.env.SHOPIFY_SHOP;
-    if (!shop) {
-        return res.status(200).json({ ok: false, reason: "Pass ?shop=your-store.myshopify.com" });
-    }
-    let token;
-    try {
-        token = (0, shopifyAdmin_1.resolveToken)(shop);
-    }
-    catch (err) {
-        if (err instanceof shopifyAdmin_1.ShopifyAdminConfigError) {
-            return res.status(200).json({ ok: false, reason: err.message });
-        }
-        throw err;
+router.get("/token-check", requireAdminKey, async (_req, res) => {
+    const shop = process.env.SHOPIFY_SHOP;
+    const token = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+    if (!shop || !token) {
+        return res.status(200).json({ ok: false, reason: "SHOPIFY_SHOP or SHOPIFY_ADMIN_ACCESS_TOKEN not set" });
     }
     try {
         const shopRes = await fetch(`https://${shop}/admin/api/2026-07/shop.json`, {
@@ -139,25 +117,16 @@ router.get("/token-check", requireAdminKey, async (req, res) => {
     }
 });
 /**
- * GET /admin/recent-orders?shop=your-store.myshopify.com
- * Lists the most recent orders (from that shop) with a direct Shopify admin
- * link to each - handy for pulling up "the order the tester just placed"
- * without digging through the admin UI. `shop` defaults to SHOPIFY_SHOP.
+ * GET /admin/recent-orders
+ * Lists the most recent orders with a direct Shopify admin link to each -
+ * handy for pulling up "the order the tester just placed" without digging
+ * through the admin UI.
  */
-router.get("/recent-orders", requireAdminKey, async (req, res) => {
-    const shop = req.query.shop || process.env.SHOPIFY_SHOP;
-    if (!shop) {
-        return res.status(200).json({ error: "Pass ?shop=your-store.myshopify.com" });
-    }
-    let token;
-    try {
-        token = (0, shopifyAdmin_1.resolveToken)(shop);
-    }
-    catch (err) {
-        if (err instanceof shopifyAdmin_1.ShopifyAdminConfigError) {
-            return res.status(200).json({ error: err.message });
-        }
-        throw err;
+router.get("/recent-orders", requireAdminKey, async (_req, res) => {
+    const shop = process.env.SHOPIFY_SHOP;
+    const token = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+    if (!shop || !token) {
+        return res.status(200).json({ error: "SHOPIFY_SHOP or SHOPIFY_ADMIN_ACCESS_TOKEN not set" });
     }
     try {
         const ordersRes = await fetch(`https://${shop}/admin/api/2026-07/orders.json?status=any&limit=5&order=created_at desc`, { headers: { "X-Shopify-Access-Token": token } });

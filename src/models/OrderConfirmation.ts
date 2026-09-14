@@ -9,7 +9,6 @@ export interface OrderConfirmationLineItem {
 }
 
 export interface OrderConfirmationDoc extends Document {
-  shop: string; // e.g. "store-a.myshopify.com" - which of the several stores this backend serves placed this order
   shopifyOrderId: string; // the numeric Shopify order id, as a string (safe for large ints)
   orderName: string; // e.g. "#1001" - what the customer/merchant recognise the order by
   phone: string; // E.164-ish, digits only with country code, e.g. "919876543210"
@@ -34,7 +33,6 @@ const OrderConfirmationLineItemSchema = new Schema<OrderConfirmationLineItem>(
 );
 
 const OrderConfirmationSchema = new Schema<OrderConfirmationDoc>({
-  shop: { type: String, required: true, index: true },
   shopifyOrderId: { type: String, required: true, unique: true, index: true },
   orderName: { type: String, required: true },
   phone: { type: String, required: true, index: true },

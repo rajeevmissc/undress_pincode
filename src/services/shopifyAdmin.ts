@@ -1,53 +1,27 @@
 /**
- * Minimal Shopify Admin REST client for the write actions the WhatsApp
- * confirm/cancel flow needs (cancel an order, tag an order). Multi-store
- * aware: this one backend serves several Shopify stores that all share the
- * same custom app (same Client ID/Secret - see shopifyWebhook.ts), but each
- * store's *installation* has its own Admin API access token.
- *
- * Token lookup, in order:
- *  1. SHOPIFY_ADMIN_TOKENS - a JSON object mapping shop domain -> token,
- *     e.g. {"store-a.myshopify.com":"shpat_aaa","store-b.myshopify.com":"shpat_bbb"}.
- *     Use this once more than one store is wired up.
- *  2. SHOPIFY_SHOP / SHOPIFY_ADMIN_ACCESS_TOKEN - the original single-store
- *     pair, kept as a fallback so existing single-store setups need no
- *     env var changes.
+ * Minimal Shopify Admin REST client for the one write action this app needs
+ * to make server-to-server: cancelling an order the customer declined over
+ * WhatsApp. Uses the same custom app (SHOPIFY_ADMIN_ACCESS_TOKEN) as the
+ * carrier-service registration script - that token needs the `write_orders`
+ * scope added (and the app reinstalled) for this to work; see README.
  */
 
+const SHOP = process.env.SHOPIFY_SHOP;
+const TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
 const API_VERSION = "2026-07";
 
 export class ShopifyAdminConfigError extends Error {}
 
-function parseTokenMap(): Record<string, string> {
-  const raw = process.env.SHOPIFY_ADMIN_TOKENS;
-  if (!raw) return {};
-  try {
-    const parsed = JSON.parse(raw);
-    return typeof parsed === "object" && parsed ? parsed : {};
-  } catch {
-    console.error("SHOPIFY_ADMIN_TOKENS is set but is not valid JSON - ignoring it");
-    return {};
+function requireConfig(): { shop: string; token: string } {
+  if (!SHOP || !TOKEN) {
+    throw new ShopifyAdminConfigError("SHOPIFY_SHOP / SHOPIFY_ADMIN_ACCESS_TOKEN are not set");
   }
+  return { shop: SHOP, token: TOKEN };
 }
 
-export function resolveToken(shop: string): string {
-  const map = parseTokenMap();
-  if (map[shop]) return map[shop];
-
-  // Single-store fallback - only valid for the one shop these legacy env
-  // vars were set up for.
-  if (shop === process.env.SHOPIFY_SHOP && process.env.SHOPIFY_ADMIN_ACCESS_TOKEN) {
-    return process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
-  }
-
-  throw new ShopifyAdminConfigError(
-    `No Admin API token configured for shop "${shop}" - add it to SHOPIFY_ADMIN_TOKENS`
-  );
-}
-
-async function adminFetch(shop: string, path: string, init: RequestInit): Promise<Response> {
-  const token = resolveToken(shop);
-  return fetch(`https://${shop}/admin/api/${API_VERSION}${path}`, {
+async function adminFetch(path: string, init: RequestInit): Promise<Response> {
+  const { shop, token } = requireConfig();
+  const res = await fetch(`https://${shop}/admin/api/${API_VERSION}${path}`, {
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -55,11 +29,12 @@ async function adminFetch(shop: string, path: string, init: RequestInit): Promis
       ...(init.headers || {}),
     },
   });
+  return res;
 }
 
 /** Cancels an order because the customer declined it over WhatsApp. */
-export async function cancelOrder(shop: string, orderId: string | number): Promise<void> {
-  const res = await adminFetch(shop, `/orders/${orderId}/cancel.json`, {
+export async function cancelOrder(orderId: string | number): Promise<void> {
+  const res = await adminFetch(`/orders/${orderId}/cancel.json`, {
     method: "POST",
     body: JSON.stringify({
       reason: "customer",
@@ -75,8 +50,8 @@ export async function cancelOrder(shop: string, orderId: string | number): Promi
 }
 
 /** Appends a tag to an order (e.g. "WhatsApp Confirmed") without clobbering existing tags. */
-export async function addOrderTag(shop: string, orderId: string | number, tag: string): Promise<void> {
-  const getRes = await adminFetch(shop, `/orders/${orderId}.json?fields=id,tags`, { method: "GET" });
+export async function addOrderTag(orderId: string | number, tag: string): Promise<void> {
+  const getRes = await adminFetch(`/orders/${orderId}.json?fields=id,tags`, { method: "GET" });
   if (!getRes.ok) {
     const text = await getRes.text().catch(() => "");
     throw new Error(`Shopify getOrder failed: ${getRes.status} ${text}`);
@@ -88,7 +63,7 @@ export async function addOrderTag(shop: string, orderId: string | number, tag: s
     .filter(Boolean);
   if (existingTags.includes(tag)) return; // already tagged, nothing to do
 
-  const putRes = await adminFetch(shop, `/orders/${orderId}.json`, {
+  const putRes = await adminFetch(`/orders/${orderId}.json`, {
     method: "PUT",
     body: JSON.stringify({ order: { id: order.id, tags: [...existingTags, tag].join(", ") } }),
   });
