@@ -119,4 +119,55 @@ router.get("/token-check", requireAdminKey, async (_req: Request, res: Response)
   }
 });
 
+/**
+ * GET /admin/recent-orders
+ * Lists the most recent orders with a direct Shopify admin link to each -
+ * handy for pulling up "the order the tester just placed" without digging
+ * through the admin UI.
+ */
+router.get("/recent-orders", requireAdminKey, async (_req: Request, res: Response) => {
+  const shop = process.env.SHOPIFY_SHOP;
+  const token = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+  if (!shop || !token) {
+    return res.status(200).json({ error: "SHOPIFY_SHOP or SHOPIFY_ADMIN_ACCESS_TOKEN not set" });
+  }
+  try {
+    const ordersRes = await fetch(
+      `https://${shop}/admin/api/2026-07/orders.json?status=any&limit=5&order=created_at desc`,
+      { headers: { "X-Shopify-Access-Token": token } }
+    );
+    if (!ordersRes.ok) {
+      const text = await ordersRes.text().catch(() => "");
+      return res.status(200).json({ error: `Shopify returned ${ordersRes.status}`, detail: text });
+    }
+    const { orders } = (await ordersRes.json()) as {
+      orders: {
+        id: number;
+        name: string;
+        total_price: string;
+        currency: string;
+        financial_status: string;
+        cancelled_at: string | null;
+        order_status_url: string;
+        tags: string;
+        created_at: string;
+      }[];
+    };
+    const storeHandle = shop.replace(".myshopify.com", "");
+    return res.json({
+      orders: orders.map((o) => ({
+        name: o.name,
+        total: `${o.currency} ${o.total_price}`,
+        status: o.cancelled_at ? "cancelled" : o.financial_status,
+        tags: o.tags,
+        createdAt: o.created_at,
+        adminLink: `https://admin.shopify.com/store/${storeHandle}/orders/${o.id}`,
+        customerOrderStatusLink: o.order_status_url,
+      })),
+    });
+  } catch (err) {
+    return res.status(200).json({ error: String(err) });
+  }
+});
+
 export default router;
