@@ -86,4 +86,37 @@ router.get("/env-check", requireAdminKey, (_req: Request, res: Response) => {
   });
 });
 
+/**
+ * GET /admin/token-check
+ * Makes one real, cheap Admin API call (GET /shop.json) with this server's
+ * SHOPIFY_ADMIN_ACCESS_TOKEN, to tell "token expired/invalid" apart from
+ * "token valid but missing a scope" apart from "everything's fine" - without
+ * ever printing the token.
+ */
+router.get("/token-check", requireAdminKey, async (_req: Request, res: Response) => {
+  const shop = process.env.SHOPIFY_SHOP;
+  const token = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN;
+  if (!shop || !token) {
+    return res.status(200).json({ ok: false, reason: "SHOPIFY_SHOP or SHOPIFY_ADMIN_ACCESS_TOKEN not set" });
+  }
+  try {
+    const shopRes = await fetch(`https://${shop}/admin/api/2026-07/shop.json`, {
+      headers: { "X-Shopify-Access-Token": token },
+    });
+    const scopesRes = await fetch(`https://${shop}/admin/oauth/access_scopes.json`, {
+      headers: { "X-Shopify-Access-Token": token },
+    });
+    const scopesBody = scopesRes.ok ? await scopesRes.json() : await scopesRes.text();
+    return res.status(200).json({
+      shopCallStatus: shopRes.status,
+      shopCallOk: shopRes.ok,
+      scopesCallStatus: scopesRes.status,
+      grantedScopes: scopesRes.ok ? scopesBody : undefined,
+      scopesCallError: scopesRes.ok ? undefined : scopesBody,
+    });
+  } catch (err) {
+    return res.status(200).json({ ok: false, error: String(err) });
+  }
+});
+
 export default router;
