@@ -10,6 +10,12 @@ router.post("/ultramsg-incoming", async (req, res) => {
     try {
         const payload = req.body;
         const data = payload?.data;
+        // Always log that we were hit at all, and with what shape - this is the
+        // one log line that fires on every delivery attempt (success, skip, or
+        // error), so "nothing in the logs" can only mean UltraMsg never called
+        // this URL, not that we called it and stayed silent.
+        console.log(`ultramsg-incoming: received event_type=${payload?.event_type} ` +
+            `type=${data?.type} fromMe=${data?.fromMe} from=${data?.from} body=${JSON.stringify(data?.body)}`);
         // Ignore anything that isn't a genuine incoming text message: our own
         // outgoing messages get echoed back through this same webhook
         // (fromMe: true), and non-"chat" types are media/location/etc, which

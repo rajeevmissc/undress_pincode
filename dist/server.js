@@ -15,6 +15,14 @@ const whatsappWebhook_1 = __importDefault(require("./routes/whatsappWebhook"));
 async function main() {
     await (0, db_1.connectDb)();
     const app = (0, express_1.default)();
+    // Logs every request under /webhooks regardless of whether it matches a
+    // route below - so a 404 from a slightly-wrong URL (trailing slash, typo,
+    // wrong path) still shows up here, instead of silently vanishing before
+    // ever reaching orderWebhook/whatsappWebhook's own logging.
+    app.use("/webhooks", (req, _res, next) => {
+        console.log(`webhook request: ${req.method} ${req.originalUrl}`);
+        next();
+    });
     // Shopify signs the orders/create webhook over the exact raw request bytes -
     // this MUST be mounted with a raw body parser, and BEFORE the global
     // express.json() below, or the signature can never verify. Scoped to this
