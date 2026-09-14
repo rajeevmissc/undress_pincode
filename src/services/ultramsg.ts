@@ -74,8 +74,10 @@ export function buildOrderConfirmationMessage(opts: {
   currency: string;
   items: OrderConfirmationLineItem[];
   orderStatusUrl?: string | null;
+  address?: string | null;
+  phone?: string | null;
 }): string {
-  const { customerName, orderName, amount, currency, items, orderStatusUrl } = opts;
+  const { customerName, orderName, amount, currency, items, orderStatusUrl, address, phone } = opts;
   const itemsBlock = formatItemsList(items, currency);
 
   return (
@@ -85,6 +87,8 @@ export function buildOrderConfirmationMessage(opts: {
     `Your order *${orderName}* has been placed successfully! 🎉\n\n` +
     (itemsBlock ? `📦 *Order Summary*\n${itemsBlock}\n\n` : "") +
     `💰 *Total: ${money(currency, amount)}* _(Cash on Delivery)_\n\n` +
+    (address ? `📍 *Delivery Address*\n${address}\n\n` : "") +
+    (phone ? `📞 *Contact:* +${phone}\n\n` : "") +
     trackingLine(orderStatusUrl) +
     `Please confirm this order so we can get it packed and shipped:\n\n` +
     `✅ Reply *CONFIRM* to confirm\n` +

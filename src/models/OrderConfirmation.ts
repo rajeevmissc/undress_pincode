@@ -17,6 +17,7 @@ export interface OrderConfirmationDoc extends Document {
   customerName: string;
   items: OrderConfirmationLineItem[];
   orderStatusUrl: string | null; // Shopify's own per-order, per-customer tracking page
+  address: string | null; // formatted single-line shipping (or billing) address
   status: ConfirmationStatus;
   createdAt: Date;
   respondedAt: Date | null;
@@ -40,6 +41,7 @@ const OrderConfirmationSchema = new Schema<OrderConfirmationDoc>({
   customerName: { type: String, default: "there" },
   items: { type: [OrderConfirmationLineItemSchema], default: [] },
   orderStatusUrl: { type: String, default: null },
+  address: { type: String, default: null },
   status: { type: String, enum: ["pending", "confirmed", "cancelled"], default: "pending", index: true },
   createdAt: { type: Date, default: () => new Date() },
   respondedAt: { type: Date, default: null },

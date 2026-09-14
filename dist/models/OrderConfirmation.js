@@ -16,6 +16,7 @@ const OrderConfirmationSchema = new mongoose_1.Schema({
     customerName: { type: String, default: "there" },
     items: { type: [OrderConfirmationLineItemSchema], default: [] },
     orderStatusUrl: { type: String, default: null },
+    address: { type: String, default: null },
     status: { type: String, enum: ["pending", "confirmed", "cancelled"], default: "pending", index: true },
     createdAt: { type: Date, default: () => new Date() },
     respondedAt: { type: Date, default: null },

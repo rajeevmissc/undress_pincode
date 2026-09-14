@@ -15,10 +15,30 @@ interface ShopifyOrderWebhookPayload {
   payment_gateway_names?: string[];
   phone?: string | null;
   customer?: { first_name?: string; phone?: string | null } | null;
-  shipping_address?: { first_name?: string; phone?: string | null } | null;
-  billing_address?: { first_name?: string; phone?: string | null } | null;
+  shipping_address?: ShopifyAddress | null;
+  billing_address?: ShopifyAddress | null;
   line_items?: { title: string; quantity: number; price: string }[];
   order_status_url?: string | null; // Shopify's own per-order, per-customer tracking page
+}
+
+interface ShopifyAddress {
+  first_name?: string;
+  phone?: string | null;
+  address1?: string | null;
+  address2?: string | null;
+  city?: string | null;
+  province?: string | null;
+  zip?: string | null;
+  country?: string | null;
+}
+
+/** One readable line, e.g. "12 MG Road, Apt 4, Bengaluru, Karnataka 560001". */
+function formatAddress(addr: ShopifyAddress | null | undefined): string | null {
+  if (!addr) return null;
+  const line1 = [addr.address1, addr.address2].filter(Boolean).join(", ");
+  const cityState = [addr.city, addr.province].filter(Boolean).join(", ");
+  const parts = [line1, [cityState, addr.zip].filter(Boolean).join(" ")].filter(Boolean);
+  return parts.length ? parts.join(", ") : null;
 }
 
 function isCodOrder(payload: ShopifyOrderWebhookPayload): boolean {
@@ -92,6 +112,7 @@ router.post("/", async (req: Request, res: Response) => {
     const customerName = pickCustomerName(payload);
     const items = pickLineItems(payload);
     const orderStatusUrl = payload.order_status_url || null;
+    const address = formatAddress(payload.shipping_address || payload.billing_address);
 
     await OrderConfirmation.create({
       shopifyOrderId: String(payload.id),
@@ -102,6 +123,7 @@ router.post("/", async (req: Request, res: Response) => {
       customerName,
       items,
       orderStatusUrl,
+      address,
       status: "pending",
     });
 
@@ -112,6 +134,8 @@ router.post("/", async (req: Request, res: Response) => {
       currency: payload.currency,
       items,
       orderStatusUrl,
+      address,
+      phone,
     });
     await sendWhatsAppMessage(phone, message);
 

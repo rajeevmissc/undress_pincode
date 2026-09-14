@@ -6,6 +6,15 @@ const phone_1 = require("../services/phone");
 const ultramsg_1 = require("../services/ultramsg");
 const OrderConfirmation_1 = require("../models/OrderConfirmation");
 const router = (0, express_1.Router)();
+/** One readable line, e.g. "12 MG Road, Apt 4, Bengaluru, Karnataka 560001". */
+function formatAddress(addr) {
+    if (!addr)
+        return null;
+    const line1 = [addr.address1, addr.address2].filter(Boolean).join(", ");
+    const cityState = [addr.city, addr.province].filter(Boolean).join(", ");
+    const parts = [line1, [cityState, addr.zip].filter(Boolean).join(" ")].filter(Boolean);
+    return parts.length ? parts.join(", ") : null;
+}
 function isCodOrder(payload) {
     return (payload.payment_gateway_names || []).some((name) => name.toLowerCase().includes("cash on delivery"));
 }
@@ -61,6 +70,7 @@ router.post("/", async (req, res) => {
         const customerName = pickCustomerName(payload);
         const items = pickLineItems(payload);
         const orderStatusUrl = payload.order_status_url || null;
+        const address = formatAddress(payload.shipping_address || payload.billing_address);
         await OrderConfirmation_1.OrderConfirmation.create({
             shopifyOrderId: String(payload.id),
             orderName: payload.name,
@@ -70,6 +80,7 @@ router.post("/", async (req, res) => {
             customerName,
             items,
             orderStatusUrl,
+            address,
             status: "pending",
         });
         const message = (0, ultramsg_1.buildOrderConfirmationMessage)({
@@ -79,6 +90,8 @@ router.post("/", async (req, res) => {
             currency: payload.currency,
             items,
             orderStatusUrl,
+            address,
+            phone,
         });
         await (0, ultramsg_1.sendWhatsAppMessage)(phone, message);
         return res.status(200).json({ ok: true });

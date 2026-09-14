@@ -57,7 +57,7 @@ function trackingLine(orderStatusUrl) {
 }
 /** The order-confirmation prompt sent right after a COD order is placed. */
 function buildOrderConfirmationMessage(opts) {
-    const { customerName, orderName, amount, currency, items, orderStatusUrl } = opts;
+    const { customerName, orderName, amount, currency, items, orderStatusUrl, address, phone } = opts;
     const itemsBlock = formatItemsList(items, currency);
     return (`🛍️ *${BRAND_NAME}*\n` +
         `${BRAND_DIVIDER}\n\n` +
@@ -65,6 +65,8 @@ function buildOrderConfirmationMessage(opts) {
         `Your order *${orderName}* has been placed successfully! 🎉\n\n` +
         (itemsBlock ? `📦 *Order Summary*\n${itemsBlock}\n\n` : "") +
         `💰 *Total: ${money(currency, amount)}* _(Cash on Delivery)_\n\n` +
+        (address ? `📍 *Delivery Address*\n${address}\n\n` : "") +
+        (phone ? `📞 *Contact:* +${phone}\n\n` : "") +
         trackingLine(orderStatusUrl) +
         `Please confirm this order so we can get it packed and shipped:\n\n` +
         `✅ Reply *CONFIRM* to confirm\n` +
