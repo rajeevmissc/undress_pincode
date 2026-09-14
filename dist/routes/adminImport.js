@@ -61,4 +61,26 @@ router.post("/test-whatsapp", requireAdminKey, async (req, res) => {
         return res.status(502).json({ error: "UltraMsg send failed", detail: String(err) });
     }
 });
+/**
+ * GET /admin/env-check
+ * Reports which env vars critical to the webhook/WhatsApp flow are actually
+ * set on THIS running process, and a few harmless characteristics (length,
+ * first/last character) so a copy-paste mistake (stray space, wrong var,
+ * truncated paste) can be spotted without ever printing the secret itself.
+ */
+router.get("/env-check", requireAdminKey, (_req, res) => {
+    const describe = (name) => {
+        const v = process.env[name];
+        if (!v)
+            return { set: false };
+        return { set: true, length: v.length, startsWith: v.slice(0, 4), endsWith: v.slice(-4) };
+    };
+    return res.json({
+        SHOPIFY_SHOP: describe("SHOPIFY_SHOP"),
+        SHOPIFY_ADMIN_ACCESS_TOKEN: describe("SHOPIFY_ADMIN_ACCESS_TOKEN"),
+        SHOPIFY_CLIENT_SECRET: describe("SHOPIFY_CLIENT_SECRET"),
+        ULTRAMSG_INSTANCE_ID: describe("ULTRAMSG_INSTANCE_ID"),
+        ULTRAMSG_TOKEN: describe("ULTRAMSG_TOKEN"),
+    });
+});
 exports.default = router;

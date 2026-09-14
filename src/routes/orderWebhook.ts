@@ -51,9 +51,17 @@ function pickCustomerName(payload: ShopifyOrderWebhookPayload): string {
 router.post("/", async (req: Request, res: Response) => {
   try {
     const rawBody = req.body as Buffer;
-    const hmacOk = verifyShopifyWebhook(rawBody, req.get("X-Shopify-Hmac-Sha256"));
+    const hmacHeader = req.get("X-Shopify-Hmac-Sha256");
+    const hmacOk = verifyShopifyWebhook(rawBody, hmacHeader);
     if (!hmacOk) {
-      console.warn("orders/create webhook: invalid HMAC, rejecting");
+      // Never log the secret or the digests themselves - just enough shape
+      // to tell "env var missing" apart from "env var wrong" apart from
+      // "body not raw" without exposing anything sensitive.
+      console.warn(
+        `orders/create webhook: invalid HMAC, rejecting ` +
+          `(secretConfigured=${!!process.env.SHOPIFY_CLIENT_SECRET}, ` +
+          `headerPresent=${!!hmacHeader}, bodyIsBuffer=${Buffer.isBuffer(rawBody)}, bodyBytes=${rawBody?.length ?? "n/a"})`
+      );
       return res.status(401).send("invalid signature");
     }
 
